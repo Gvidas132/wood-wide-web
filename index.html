@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An incremental game about a fungal network spreading through a forest floor.">
+<title>Wood Wide Web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a glowing forest-floor cross-section on the left, a field ledger of actions on the right; stacks on phones. */
+:root {
+  --bg: #15110d; --bg2: #1f1812; --panel: #241c15; --line: #3f3226; --fg: #f1e8d6; --dim: #ab9b8b;
+  --nut: #f0b452; --sugar: #ef8fa6; --spore: #7fdcc8; --hypha: #fff3dc;
+  --glow1: rgba(127, 220, 200, .10); --glow2: rgba(240, 180, 82, .08); --shade: rgba(0, 0, 0, .55);
+  --frame: #0f0b08; --cap: #c8553d; --capdot: #f6e7cf; --stem: #eadfc8; --blend: lighter;
+  --loam: #4b3524; --litter: #85622a; --wood: #5e3b29; --root: #74494b; --seep: #2a5560; --stone: #57534d; --truffle: #45304d;
+  --icon: rgba(255, 243, 220, .5);
+  --display: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  --body: 'Atkinson Hyperlegible', 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #efe5d3; --bg2: #e6d9c2; --panel: #f9f3e8; --line: #d8c7ae; --fg: #2a1f16; --dim: #6f5f4e;
+  --nut: #a96a0c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
+  --glow1: rgba(31, 127, 109, .10); --glow2: rgba(169, 106, 12, .10); --shade: rgba(60, 40, 20, .25);
+  --frame: #4a3727; --cap: #b2442d; --capdot: #fff6e6; --stem: #f3ead8; --blend: source-over;
+  --loam: #8a6a4c; --litter: #b88f45; --wood: #8a5a3e; --root: #a06c6b; --seep: #4f8c98; --stone: #8f8a82; --truffle: #7a5a86;
+  --icon: rgba(255, 248, 235, .6);
+  color-scheme: light;
+} }
+:root[data-theme="light"] {
+  --bg: #efe5d3; --bg2: #e6d9c2; --panel: #f9f3e8; --line: #d8c7ae; --fg: #2a1f16; --dim: #6f5f4e;
+  --nut: #a96a0c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
+  --glow1: rgba(31, 127, 109, .10); --glow2: rgba(169, 106, 12, .10); --shade: rgba(60, 40, 20, .25);
+  --frame: #4a3727; --cap: #b2442d; --capdot: #fff6e6; --stem: #f3ead8; --blend: source-over;
+  --loam: #8a6a4c; --litter: #b88f45; --wood: #8a5a3e; --root: #a06c6b; --seep: #4f8c98; --stone: #8f8a82; --truffle: #7a5a86;
+  --icon: rgba(255, 248, 235, .6);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--fg); font: 15px/1.45 var(--body);
+  background: radial-gradient(ellipse 70% 50% at 20% 0%, var(--glow1), transparent 70%),
+              radial-gradient(ellipse 60% 50% at 100% 100%, var(--glow2), transparent 70%), var(--bg);
+  background-attachment: fixed; min-height: 100vh; }
+#motes { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+/* Header */
+header { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; padding-block: 6px 18px; }
+.brand { display: flex; gap: 10px; align-items: center; margin-right: auto; }
+.brand svg { width: 44px; height: 44px; flex: none; }
+h1 { font: 800 32px/1 var(--display); margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+.brand small { display: block; color: var(--dim); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; margin-top: 3px; }
+.chip { display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 10px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+.chip svg { width: 26px; height: 26px; flex: none; }
+.chip b { display: block; font: 600 20px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.chip small { display: block; font: 12px var(--mono); color: var(--dim); }
+.c-nut { color: var(--nut); } .c-sug { color: var(--sugar); } .c-spo { color: var(--spore); }
+.chip.c-nut b, .chip.c-sug b, .chip.c-spo b { color: inherit; }
+.meter { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; width: 0; background: currentColor; border-radius: 4px; transition: width .3s; }
+
+/* Forest */
+main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+.forest { position: relative; width: 100%; max-width: 600px; aspect-ratio: 1; padding: 10px; border-radius: 16px;
+  background: radial-gradient(circle at 50% 45%, var(--bg2), var(--frame) 80%);
+  box-shadow: inset 0 0 50px var(--shade), 0 10px 30px var(--shade); }
+#grid, #threads { position: absolute; inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); }
+#grid { display: grid; gap: 4px; }
+#threads { pointer-events: none; z-index: 2; }
+.tile { --tc: var(--loam); position: relative; border: 0; border-radius: 6px; padding: 0; cursor: pointer; color: var(--fg);
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--tc), white 14%), var(--tc) 72%);
+  filter: saturate(.35) brightness(.55); transition: filter .4s; }
+.tile::before { content: ''; position: absolute; inset: 24%; background: var(--icon);
+  -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+.tile.c { filter: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hypha) 35%, transparent), inset 0 -6px 12px var(--shade); }
+.tile.reach { filter: saturate(.7) brightness(.8); outline: 1px dashed color-mix(in srgb, var(--fg) 60%, transparent); outline-offset: -1px; }
+.tile.afford { outline: 2px solid var(--spore); outline-offset: -2px; animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { outline-color: transparent; } }
+.tile.sel { outline: 3px solid var(--nut); outline-offset: 1px; z-index: 3; animation: none; }
+.tile:focus-visible { outline: 3px solid var(--spore); z-index: 3; }
+.tile:hover { filter: brightness(1.15); }
+.tile .lv { position: absolute; right: 3px; bottom: 2px; z-index: 4; font: 600 10px var(--mono); color: var(--hypha);
+  text-shadow: 0 0 3px var(--frame), 0 0 3px var(--frame); }
+.t-loam { --tc: var(--loam); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='7' cy='15' r='3'/><circle cx='15' cy='9' r='2.5'/><circle cx='17' cy='17' r='2'/><circle cx='9' cy='7' r='1.5'/></svg>"); }
+.t-litter { --tc: var(--litter); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M4 20C4 10 10 4 21 3c-1 11-7 17-17 17z'/></svg>"); }
+.t-wood { --tc: var(--wood); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 8h13v8H3z'/><circle cx='17' cy='12' r='5'/></svg>"); }
+.t-root { --tc: var(--root); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'><path d='M12 2v9M12 11l-6 6M6 17l-2 4M12 11l5 4M17 15v6M12 11v5'/></svg>"); }
+.t-seep { --tc: var(--seep); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2s7 8 7 13a7 7 0 0 1-14 0c0-5 7-13 7-13z'/></svg>"); }
+.t-stone { --tc: var(--stone); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 17l3-8 6-4 7 3 2 9-6 3H7z'/></svg>"); }
+.t-truffle { --tc: var(--truffle); --ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='13' r='7'/><circle cx='7' cy='8' r='3'/><circle cx='16' cy='7' r='3'/><circle cx='18' cy='14' r='3'/></svg>"); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 14px; max-width: 600px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); padding: 3px 9px 3px 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.legend i { position: relative; width: 18px; height: 18px; border-radius: 4px; background: var(--tc); }
+.legend i::before { content: ''; position: absolute; inset: 3px; background: var(--icon); -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+
+/* Ledger */
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.card h2 { font: 800 19px var(--display); margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card h2 .tag { font: 600 12px var(--mono); color: var(--nut); background: color-mix(in srgb, var(--nut) 15%, transparent); padding: 2px 8px; border-radius: 999px; }
+.card p { margin: 0 0 10px; color: var(--dim); }
+.tilehead { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.tilehead .swatch { width: 44px; height: 44px; flex: none; border-radius: 8px; position: relative; background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--tc), white 14%), var(--tc) 72%); }
+.tilehead .swatch::before { content: ''; position: absolute; inset: 9px; background: var(--icon); -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+.tilehead h2 { margin: 0; }
+.stat { font: 13px var(--mono); color: var(--fg); background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.act { font: 700 14px var(--body); padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer;
+  transition: transform .08s, border-color .15s, background .15s; }
+button.act:hover:not(:disabled) { border-color: var(--nut); background: color-mix(in srgb, var(--nut) 10%, var(--bg)); }
+button.act:active:not(:disabled) { transform: translateY(1px) scale(.98); }
+button.act:disabled { opacity: .4; cursor: default; }
+button.act.go { border-color: var(--nut); color: var(--nut); }
+button.big { font: 800 17px var(--display); padding: 12px 20px; border-color: var(--spore); color: var(--spore); }
+button.big.ready { background: color-mix(in srgb, var(--spore) 14%, var(--bg)); box-shadow: 0 0 0 0 var(--spore); animation: ready 2s ease-out infinite; }
+@keyframes ready { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--spore) 50%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+.cost { font: 13px var(--mono); color: var(--dim); }
+.cost.ok { color: var(--nut); }
+.spcard { background: linear-gradient(160deg, color-mix(in srgb, var(--spore) 10%, var(--panel)), var(--panel) 60%); }
+.spcard .meter { height: 8px; margin: 4px 0 12px; color: var(--spore); }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); }
+.tabs button { position: relative; font: 700 14px var(--body); background: none; border: 0; border-bottom: 3px solid transparent; color: var(--dim); padding: 8px 11px; cursor: pointer; }
+.tabs button.on { color: var(--fg); border-color: var(--nut); }
+.tabs button.dot::after { content: ''; position: absolute; top: 6px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--spore); box-shadow: 0 0 6px var(--spore); }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.item.done { opacity: .6; }
+.item.got { border-color: color-mix(in srgb, var(--spore) 50%, var(--line)); }
+.item .nm { font-weight: 700; }
+.item .ds { color: var(--dim); font-size: 13px; }
+.item .ef { font: 12px var(--mono); color: var(--spore); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 13px; }
+.kv dt { color: var(--dim); } .kv dd { margin: 0; font-family: var(--mono); }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; margin-right: 14px; font-size: 14px; }
+textarea { width: 100%; min-height: 70px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; font: 12px var(--mono); }
+#toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30;
+  background: var(--panel); border: 1px solid var(--spore); padding: 11px 18px; border-radius: 999px; box-shadow: 0 8px 24px var(--shade); font-weight: 700; max-width: calc(100% - 32px); }
+.float { position: fixed; z-index: 25; pointer-events: none; transform: translate(-50%, 0); font: 600 14px var(--mono); color: var(--nut);
+  text-shadow: 0 1px 4px var(--shade); animation: rise 1s ease-out forwards; white-space: nowrap; }
+.float.spo { color: var(--spore); } .float.sug { color: var(--sugar); }
+@keyframes rise { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -42px); } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.afford, button.big.ready { animation: none; }
+  .float { animation: fade 1s forwards; } @keyframes fade { to { opacity: 0; } }
+}
+</style>
+
+</head>
+<body>
+<canvas id="motes"></canvas>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 26C8 14 16 7 24 7s16 7 16 19z" fill="var(--cap)"/><circle cx="17" cy="18" r="3" fill="var(--capdot)"/><circle cx="28" cy="14" r="2.4" fill="var(--capdot)"/><circle cx="32" cy="22" r="2" fill="var(--capdot)"/><path d="M19 26h10l-1 14h-8z" fill="var(--stem)"/><path d="M24 40c-4 3-10 3-16 2M24 40c4 3 10 4 17 1M24 40v5" stroke="var(--hypha)" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".7"/></svg>
+      <div><h1>Wood Wide Web</h1><small>Grow a fungal network under the forest</small></div>
+    </div>
+    <div class="chip c-nut">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" opacity=".25"/><circle cx="12" cy="12" r="5" fill="currentColor"/></svg>
+      <div><b id="nut">0</b><small id="nutps">0/s</small></div>
+    </div>
+    <div class="chip c-sug">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 5v8l-7 5-7-5V8z" fill="currentColor" opacity=".3"/><path d="M12 7l4 3v4l-4 3-4-3v-4z" fill="currentColor"/></svg>
+      <div><b id="sug">0</b><small id="sugps">0/s</small></div>
+    </div>
+    <div class="chip c-spo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3" fill="currentColor"/><circle cx="16" cy="8" r="2" fill="currentColor" opacity=".7"/><circle cx="14" cy="16" r="3.5" fill="currentColor" opacity=".85"/><circle cx="6" cy="17" r="1.6" fill="currentColor" opacity=".5"/></svg>
+      <div><b id="spo">0</b><small id="lin">Lineage 0</small><div class="meter" title="Progress to the next Migrate"><i id="linbar"></i></div></div>
+    </div>
+  </header>
+  <main>
+    <section>
+      <div class="forest"><div id="grid" role="grid" aria-label="Forest floor"></div><canvas id="threads"></canvas></div>
+      <div class="legend">
+        <span><i class="t-loam"></i>Loam</span><span><i class="t-litter"></i>Leaf litter</span><span><i class="t-wood"></i>Deadwood</span>
+        <span><i class="t-root"></i>Tree root</span><span><i class="t-seep"></i>Water seep</span><span><i class="t-stone"></i>Stone</span><span><i class="t-truffle"></i>Truffle</span>
+      </div>
+    </section>
+    <section class="side">
+      <div class="card" id="tilecard"></div>
+      <div class="card">
+        <div class="row">
+          <button class="act go" id="feedall">Feed all</button>
+          <button class="act go" id="colall">Colonize all affordable</button>
+          <span class="cost">Feed all spends on the cheapest tiles first.</span>
+        </div>
+      </div>
+      <div class="card spcard">
+        <h2>Sporulate <span class="tag" id="sporetag"></span></h2>
+        <p>Grow a mushroom and release spores. You start over in a new random forest and lose its nutrients and sugar. Spores come from every nutrient made this run.</p>
+        <div class="meter"><i id="sporebar"></i></div>
+        <div class="row"><button class="act big" id="sporulate">Sporulate</button><span class="cost" id="sporeinfo"></span></div>
+      </div>
+      <div class="card">
+        <nav class="tabs" id="tabs">
+          <button data-tab="trades" class="on">Sugar trades</button>
+          <button data-tab="genome">Genome</button>
+          <button data-tab="lineage">Lineage</button>
+          <button data-tab="ach">Achievements</button>
+          <button data-tab="opts">Settings</button>
+        </nav>
+        <div id="tabbody" style="padding-top:12px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast" hidden></div>
+
+<script src="game.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let sel = -1, tab = 'trades', builtFor = '', tabSig = '';
+const TRAIT_SWITCH = { autof: 'feed', autoc: 'col' }; // traits with an on/off switch in the Genome tab
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ok = c => c <= G.nut.l + 1e-9;
+
+function load() {
+  try {
+    const s = localStorage.getItem(SAVE_KEY);
+    if (s) { G = deserialize(s); offline(); }
+  } catch (e) { G = newGame(); }
+}
+function save() { try { localStorage.setItem(SAVE_KEY, serialize()); } catch (e) {} }
+function offline() {
+  const sec = Math.min((Date.now() - G.last) / 1000, 8 * 3600);
+  if (sec < 10) return;
+  const steps = 200, dt = sec / steps;
+  for (let i = 0; i < steps; i++) tick(dt);
+  toast('While you were away (' + fmtTime(sec) + ') your colony kept growing.');
+}
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+
+// ----- Juice: floating numbers, pops, spore bursts -----
+function floatAt(el, text, cls = '') {
+  if (!el) return;
+  const r = el.getBoundingClientRect(), f = document.createElement('div');
+  f.className = 'float ' + cls; f.textContent = text;
+  f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = (r.top - 4) + 'px';
+  document.body.appendChild(f); setTimeout(() => f.remove(), 1000);
+}
+function pop(el) { if (el && !reduceMotion) el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.22)' }, { transform: 'scale(1)' }], { duration: 280, easing: 'ease-out' }); }
+
+// ----- Theme colours for canvas drawing -----
+let C = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement), v = n => cs.getPropertyValue(n).trim();
+  C = { hypha: v('--hypha'), nut: v('--nut'), sugar: v('--sugar'), spore: v('--spore'), cap: v('--cap'), capdot: v('--capdot'), stem: v('--stem'), blend: v('--blend') || 'lighter' };
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ----- Forest -----
+let edges = [], edgeSig = '';
+function buildGrid() {
+  const g = $('grid');
+  g.style.gridTemplateColumns = `repeat(${G.size}, 1fr)`;
+  g.innerHTML = '';
+  G.grid.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.className = 'tile'; b.id = 'tile' + i;
+    b.innerHTML = '<span class="lv"></span>';
+    b.onclick = () => { sel = i; refresh(); };
+    g.appendChild(b);
+  });
+  builtFor = G.seed + ':' + G.size;
+  if (sel >= G.grid.length) sel = -1;
+}
+function renderGrid() {
+  if (builtFor !== G.seed + ':' + G.size) buildGrid();
+  G.grid.forEach((t, i) => {
+    const b = $('tile' + i);
+    const reach = !t.c && canColonize(i);
+    const afford = reach && ok(colCost(i));
+    b.className = `tile t-${t.t}${t.c ? ' c' : ''}${reach ? ' reach' : ''}${afford ? ' afford' : ''}${i === sel ? ' sel' : ''}`;
+    b.firstChild.textContent = t.c && t.t !== 'stone' ? t.l : '';
+    b.setAttribute('aria-label', `${TILES[t.t].name}${t.c ? ', level ' + t.l : reach ? ', can colonize' : ', not colonized'}`);
+  });
+  const sig = builtFor + G.grid.map(t => t.c).join('');
+  if (sig !== edgeSig) {
+    edgeSig = sig; edges = [];
+    const s = G.size;
+    for (let i = 0; i < G.grid.length; i++) {
+      if (!G.grid[i].c) continue;
+      for (const j of [i + 1, i + s]) {
+        if (j >= G.grid.length || !G.grid[j].c || (j === i + 1 && j % s === 0)) continue;
+        edges.push({ a: i, b: j, bend: (((i * 7919 + j * 104729) % 97) / 97 - .5), sugar: G.grid[i].t === 'root' || G.grid[j].t === 'root' });
+      }
+    }
+  }
+}
+
+// Threads, flowing nutrients and mushrooms, drawn every frame over the tiles
+let particles = [];
+function center(i, cell, gap) { const s = G.size; return [(i % s) * cell + (cell - gap) / 2, Math.floor(i / s) * cell + (cell - gap) / 2]; }
+function curve(e, cell, gap, ts) {
+  const [x1, y1] = center(e.a, cell, gap), [x2, y2] = center(e.b, cell, gap);
+  const w = reduceMotion ? 0 : Math.sin(ts / 1400 + e.bend * 20) * .06;
+  const k = (e.bend * .5 + w) * cell;
+  return [x1, y1, (x1 + x2) / 2 + (y2 - y1) / cell * k, (y1 + y2) / 2 - (x2 - x1) / cell * k, x2, y2];
+}
+function drawMushroom(cx, x, y, s) {
+  cx.fillStyle = C.stem;
+  cx.beginPath(); cx.moveTo(x - s * .14, y); cx.lineTo(x - s * .1, y - s * .55); cx.lineTo(x + s * .1, y - s * .55); cx.lineTo(x + s * .14, y); cx.fill();
+  cx.fillStyle = C.cap;
+  cx.beginPath(); cx.ellipse(x, y - s * .55, s * .45, s * .38, 0, Math.PI, 0); cx.fill();
+  cx.fillStyle = C.capdot;
+  cx.beginPath(); cx.arc(x - s * .16, y - s * .72, s * .06, 0, 7); cx.arc(x + s * .12, y - s * .8, s * .05, 0, 7); cx.fill();
+}
+function frame(ts) {
+  const cv = $('threads'), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const cx = cv.getContext('2d'), gap = 4 * dpr, cell = (W + gap) / G.size;
+  cx.clearRect(0, 0, W, H);
+  cx.globalCompositeOperation = 'source-over';
+  cx.lineCap = 'round'; cx.strokeStyle = C.hypha;
+  for (const e of edges) {
+    const p = curve(e, cell, gap, ts), lv = Math.min(G.grid[e.a].l || 1, G.grid[e.b].l || 1);
+    cx.globalAlpha = .65;
+    cx.lineWidth = (1 + Math.log2(lv) * .45) * dpr;
+    cx.beginPath(); cx.moveTo(p[0], p[1]); cx.quadraticCurveTo(p[2], p[3], p[4], p[5]); cx.stroke();
+  }
+  cx.globalAlpha = 1;
+  if (!reduceMotion && edges.length) {
+    const want = Math.min(180, edges.length * 3);
+    for (let k = 0; k < 3 && particles.length < want; k++) {
+      const e = edges[Math.floor(Math.random() * edges.length)];
+      particles.push({ e, t: 0, rev: Math.random() < .5, sp: .006 + Math.random() * .01 });
+    }
+    cx.globalCompositeOperation = C.blend;
+    particles = particles.filter(q => edges.includes(q.e) && (q.t += q.sp) < 1);
+    for (const q of particles) {
+      const p = curve(q.e, cell, gap, ts), t = q.rev ? 1 - q.t : q.t, u = 1 - t;
+      const x = u * u * p[0] + 2 * u * t * p[2] + t * t * p[4], y = u * u * p[1] + 2 * u * t * p[3] + t * t * p[5];
+      const col = q.e.sugar ? C.sugar : C.nut, a = Math.sin(q.t * Math.PI);
+      cx.fillStyle = col;
+      cx.globalAlpha = .25 * a; cx.beginPath(); cx.arc(x, y, 4.5 * dpr, 0, 7); cx.fill();
+      cx.globalAlpha = .95 * a; cx.beginPath(); cx.arc(x, y, 1.6 * dpr, 0, 7); cx.fill();
+    }
+    cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over';
+  }
+  // Mushrooms sprout on well-fed tiles: one at level 25, two at 100, three at 400
+  const spots = [[.3, .42], [.72, .38], [.5, .3]];
+  G.grid.forEach((t, i) => {
+    if (!t.c || t.t === 'stone' || t.l < 25) return;
+    const n = t.l >= 400 ? 3 : t.l >= 100 ? 2 : 1, x0 = (i % G.size) * cell, y0 = Math.floor(i / G.size) * cell;
+    const s = (cell - gap) * Math.min(.42, .22 + Math.log10(t.l) * .07);
+    for (let k = 0; k < n; k++) drawMushroom(cx, x0 + (cell - gap) * spots[k][0], y0 + (cell - gap) * spots[k][1] + s * .5, s * (k === 2 ? .8 : 1));
+  });
+  requestAnimationFrame(frame);
+}
+
+// Drifting spores in the background, plus bursts when you Sporulate
+const motes = [];
+function burst(el, n = 160) {
+  if (reduceMotion || !el) return;
+  const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 5;
+    motes.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, r: 1 + Math.random() * 2.5, life: 1, burst: true });
+  }
+}
+function moteFrame() {
+  const cv = $('motes'), dpr = window.devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const cx = cv.getContext('2d');
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, W, H);
+  while (motes.filter(m => !m.burst).length < 40) motes.push({ x: Math.random() * W, y: H + Math.random() * H * .5, vx: 0, vy: -(.15 + Math.random() * .35), r: .8 + Math.random() * 2, life: 1, ph: Math.random() * 7 });
+  cx.fillStyle = C.spore;
+  for (let i = motes.length - 1; i >= 0; i--) {
+    const m = motes[i];
+    if (m.burst) { m.x += m.vx; m.y += m.vy; m.vx *= .97; m.vy = m.vy * .97 + .03; m.life -= .012; }
+    else { m.ph += .01; m.x += Math.sin(m.ph) * .3; m.y += m.vy; }
+    if (m.life <= 0 || m.y < -10) { motes.splice(i, 1); continue; }
+    cx.globalAlpha = m.burst ? m.life * .9 : .22;
+    cx.beginPath(); cx.arc(m.x, m.y, m.r, 0, 7); cx.fill();
+  }
+  requestAnimationFrame(moteFrame);
+}
+
+// ----- Selected tile card -----
+// Buttons are built only when the selection or tile state changes; numbers update in place
+let tileSig = '';
+function renderTile() {
+  const c = $('tilecard');
+  const t = sel >= 0 ? G.grid[sel] : null;
+  const sig = t ? [sel, builtFor, t.t, t.c, canColonize(sel)].join() : 'none' + builtFor;
+  if (sig !== tileSig) {
+    tileSig = sig;
+    if (!t) {
+      c.innerHTML = `<h2>Your forest floor</h2><p>Click a tile to inspect it. Your mycelium spreads to tiles touching a colonized one. Glowing outlines mark tiles you can afford right now.</p>
+        <p>Loam makes nutrients. Put loam next to <b>deadwood</b> and <b>water seeps</b> to multiply it, and reach a <b>tree root</b> to start trading for sugar.</p>`;
+      return;
+    }
+    let html = `<div class="tilehead"><div class="swatch t-${t.t}"></div><h2>${TILES[t.t].name} <span class="tag" id="tlv"></span></h2></div><p>${TILES[t.t].info}</p>`;
+    if (t.c) {
+      if (t.t === 'loam' || t.t === 'root') html += '<div class="stat" id="tout"></div>';
+      if (t.t !== 'stone') html += '<div class="row"><button class="act go" id="f1">Feed</button><button class="act go" id="fm">Feed max</button><span class="cost" id="tcost"></span></div>';
+    } else if (canColonize(sel)) {
+      html += '<div class="row"><button class="act go" id="col">Colonize</button><span class="cost" id="tcost"></span></div>';
+    } else {
+      html += `<div class="stat">${t.t === 'stone' && !has('acid') ? 'Needs the Acidic hyphae trait from the Genome tab.' : 'Out of reach. Colonize a tile next to it first.'}</div>`;
+    }
+    c.innerHTML = html;
+    const doFeed = max => { const before = t.l; feed(sel, max); if (t.l > before) { floatAt($('tile' + sel), '+' + (t.l - before) + ' lv'); pop($('tile' + sel)); } refresh(); };
+    if ($('f1')) { $('f1').onclick = () => doFeed(false); $('fm').onclick = () => doFeed(true); }
+    if ($('col')) $('col').onclick = () => { const i = sel; if (colonize(i)) { floatAt($('tile' + i), 'Colonized!', 'spo'); pop($('tile' + i)); } refresh(); };
+  }
+  if (!t) return;
+  const m = E.tiles[sel];
+  $('tlv').textContent = t.c && t.t !== 'stone' ? 'level ' + t.l : t.c ? 'colonized' : '';
+  if ($('tout')) $('tout').textContent = t.t === 'loam'
+    ? `Makes ${fmt(m.out.mul(E.global))} nutrients/s · deadwood ×${fmt(m.wood)} · seeps ×${fmt(m.seep)}`
+    : `Makes ${fmt(m.out)} sugar/s before bonuses · seeps ×${fmt(m.seep)}`;
+  const cost = t.c ? feedCost(t) : colCost(sel);
+  if ($('tcost')) { $('tcost').textContent = fmt(N.lg(cost)) + ' nutrients'; $('tcost').classList.toggle('ok', ok(cost)); }
+  if ($('f1')) $('f1').disabled = $('fm').disabled = !ok(cost);
+  if ($('col')) $('col').disabled = !ok(cost);
+}
+
+// ----- Tabs -----
+function item(name, desc, eff, btn, cls = '') {
+  return `<div class="item ${btn === null ? 'done' : ''} ${cls}"><div><div class="nm">${name}</div><div class="ds">${desc}</div>${eff ? `<div class="ef">${eff}</div>` : ''}</div><div>${btn || ''}</div></div>`;
+}
+function renderTab() {
+  let h = '';
+  if (tab === 'trades') {
+    h += '<p>Tree roots pay sugar for the nutrients you send them. Spend it here.</p><div class="list">';
+    for (const [id, t] of Object.entries(TRADES)) {
+      const c = tradeCost(id);
+      h += item(`${t.name} <span class="cost">×${G[id]}</span>`, t.desc(), t.eff(),
+        `<button class="act" data-trade="${id}" ${c > G.sugar.l + 1e-9 ? 'disabled' : ''}>${fmt(N.lg(c))} sugar</button>`);
+    }
+    h += '</div>';
+  } else if (tab === 'genome') {
+    h += '<p>Spend spores on your genome. Everything here lasts until you Migrate.</p><div class="list">';
+    for (const [id, g] of Object.entries(GENES)) {
+      const c = geneCost(id);
+      h += item(`${g.name} <span class="cost">×${G[id]}</span>`, g.desc(), g.eff(),
+        `<button class="act" data-gene="${id}" ${c > G.spores.l + 1e-9 ? 'disabled' : ''}>${fmt(N.lg(c))} spores</button>`);
+    }
+    for (const t of TRAITS) {
+      const own = has(t.id), sw = TRAIT_SWITCH[t.id];
+      const btn = !own ? `<button class="act" data-trait="${t.id}" ${G.spores.lt(t.cost) ? 'disabled' : ''}>${fmt(t.cost)} spores</button>`
+        : sw ? `<button class="act" data-switch="${sw}" aria-pressed="${G.auto[sw]}">${G.auto[sw] ? 'On' : 'Off'}</button>` : null;
+      h += item(t.name, t.desc, own && t.eff ? t.eff() : '', btn, own ? 'got' : '');
+    }
+    h += '</div>';
+  } else if (tab === 'lineage') {
+    const can = G.spores.l >= migReq() - 1e-9;
+    h += `<p>Migrate on the wind to a larger forest. You lose spores, traits and genome upgrades, and gain a lineage level: nutrients ×100 and spores ×1.5 per level, plus the perks below.</p>
+      <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${G.lineage + 1}</button><span class="cost">needs ${fmt(N.lg(migReq()))} spores</span></div><div class="list">`;
+    for (const [l, d] of LINEAGE) h += item('Lineage ' + l, d, '', G.lineage >= l ? '✓' : '', G.lineage >= l ? 'got' : '');
+    h += '</div>';
+  } else if (tab === 'ach') {
+    const n = Object.keys(G.ach).length;
+    h += `<p>${n} of ${ACHS.length}. Each one gives ×1.05 nutrients (now ×${fmt(E.ach)}).</p><div class="list">`;
+    for (const a of ACHS) h += item(a.name, a.desc, '', G.ach[a.id] ? '✓' : '', G.ach[a.id] ? 'got' : '');
+    h += '</div>';
+  } else if (tab === 'opts') {
+    h += `<div class="toggles" style="margin-bottom:12px">
+      <label><input type="checkbox" id="af" ${G.auto.feed ? 'checked' : ''}> Auto-feed</label>
+      <label><input type="checkbox" id="ac" ${G.auto.col ? 'checked' : ''}> Auto-colonize</label>
+      <label><input type="checkbox" id="at" ${G.auto.trade ? 'checked' : ''}> Auto-trade</label></div>
+      <dl class="kv"><dt>Time played</dt><dd>${fmtTime(G.stats.time)}</dd><dt>This forest</dt><dd>${fmtTime(G.stats.runTime)}</dd>
+      <dt>Sporulations</dt><dd>${G.stats.sporulations}</dd><dt>Most nutrients</dt><dd>${fmt(G.stats.best)}</dd></dl>
+      <div class="row" style="margin-top:12px"><button class="act" id="exp">Export save</button><button class="act" id="imp">Import save</button><button class="act" id="wipe">Wipe save</button></div>
+      <textarea id="savebox" placeholder="Paste a save here, then press Import save" style="margin-top:8px"></textarea>`;
+  }
+  $('tabbody').innerHTML = h;
+  bindTab();
+}
+function bindTab() {
+  const body = $('tabbody');
+  body.querySelectorAll('[data-trade]').forEach(b => b.onclick = () => { if (buyTrade(b.dataset.trade, false)) floatAt(b, 'Traded!', 'sug'); refresh(); });
+  body.querySelectorAll('[data-gene]').forEach(b => b.onclick = () => { if (buyGene(b.dataset.gene, false)) floatAt(b, '+1', 'spo'); refresh(); });
+  body.querySelectorAll('[data-trait]').forEach(b => b.onclick = () => { if (buyTrait(b.dataset.trait)) { floatAt(b, 'Evolved!', 'spo'); burst(b, 50); } refresh(); });
+  body.querySelectorAll('[data-switch]').forEach(b => b.onclick = () => { G.auto[b.dataset.switch] = !G.auto[b.dataset.switch]; refresh(); });
+  if ($('migrate')) $('migrate').onclick = e => { const b = e.target; if (migrate()) { burst(b, 300); sel = -1; toast('Your spores settled in a new forest. Lineage ' + G.lineage + '.'); refresh(); } };
+  if ($('af')) {
+    $('af').onchange = e => G.auto.feed = e.target.checked;
+    $('ac').onchange = e => G.auto.col = e.target.checked;
+    $('at').onchange = e => G.auto.trade = e.target.checked;
+    $('exp').onclick = () => { const s = serialize(); $('savebox').value = s; $('savebox').select(); navigator.clipboard?.writeText(s).then(() => toast('Save copied.'), () => toast('Save is in the box below. Copy it from there.')); };
+    $('imp').onclick = () => { try { G = deserialize($('savebox').value); sel = -1; toast('Save loaded.'); refresh(); } catch (e) { toast('That save could not be read: ' + e.message); } };
+    let armed = false;
+    $('wipe').onclick = e => { if (!armed) { armed = true; e.target.textContent = 'Press again to wipe'; return; } G = newGame(); sel = -1; save(); toast('Save wiped.'); refresh(); };
+  }
+}
+// Rebuild a tab only when something it shows changes, so buttons stay clickable
+function tabSignature() {
+  if (tab === 'opts') return 'opts';
+  if (tab === 'trades') return [G.phos, G.carbon, ...Object.keys(TRADES).map(id => tradeCost(id) <= G.sugar.l + 1e-9)].join();
+  if (tab === 'genome') return [G.dense, G.reach, Object.keys(G.traits).join(), ...Object.keys(GENES).map(id => geneCost(id) <= G.spores.l + 1e-9),
+    ...TRAITS.map(t => G.spores.gte(t.cost)), G.auto.feed, G.auto.col].join();
+  if (tab === 'lineage') return [G.lineage, G.spores.l >= migReq() - 1e-9].join();
+  return Object.keys(G.ach).length + tab;
+}
+// A dot on a tab means something in it is ready
+function tabDots() {
+  const dots = {
+    trades: Object.keys(TRADES).some(id => tradeCost(id) <= G.sugar.l + 1e-9),
+    genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !has(t.id) && G.spores.gte(t.cost)),
+    lineage: G.spores.l >= migReq() - 1e-9,
+  };
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('dot', !!dots[b.dataset.tab] && b.dataset.tab !== tab));
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  tab = b.dataset.tab; tabSig = '';
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  refresh();
+});
+
+// ----- Top-level actions -----
+$('feedall').onclick = e => { const n = feedAll(); if (n) floatAt(e.target, '+' + n + ' levels'); refresh(); };
+$('colall').onclick = e => { const n = colonizeCheapest(); if (n) floatAt(e.target, '+' + n + ' tiles', 'spo'); refresh(); };
+$('sporulate').onclick = e => { const g = E.sporeGain; if (sporulate()) { burst(e.target); sel = -1; toast('Released ' + fmt(g) + ' spores into a new forest.'); refresh(); } };
+
+function refresh() {
+  calc();
+  $('nut').textContent = fmt(G.nut); $('nutps').textContent = '+' + fmt(E.nutGain) + '/s';
+  $('sug').textContent = fmt(G.sugar); $('sugps').textContent = '+' + fmt(E.sugarGain) + '/s';
+  $('spo').textContent = fmt(G.spores); $('lin').textContent = 'Lineage ' + G.lineage;
+  $('linbar').style.width = Math.max(0, Math.min(100, (G.spores.zero ? 0 : G.spores.l / migReq()) * 100)) + '%';
+  renderGrid();
+  renderTile();
+  const can = E.sporeGain.gte(1);
+  $('sporulate').disabled = !can;
+  $('sporulate').classList.toggle('ready', can && E.sporeGain.gte(G.spores.add(1)));
+  $('sporebar').style.width = (can ? 100 : Math.max(0, Math.min(100, G.runEarned.l / 5 * 100))) + '%';
+  $('sporetag').textContent = can ? '+' + fmt(E.sporeGain) + ' spores' : '';
+  $('sporeinfo').textContent = can ? 'Earned ' + fmt(G.runEarned) + ' nutrients this run' : fmt(G.runEarned) + ' / ' + fmt(1e5) + ' nutrients made this run';
+  const sig = tabSignature();
+  if (sig !== tabSig) { tabSig = sig; renderTab(); }
+  tabDots();
+}
+
+function start(data) {
+  if (data && data.save) { try { G = deserialize(data.save); } catch (e) { load(); } } else load();
+  readColors(); calc(); refresh();
+  requestAnimationFrame(frame); requestAnimationFrame(moteFrame);
+  let last = performance.now(), n = 0;
+  setInterval(() => {
+    const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
+    for (const a of tick(dt)) toast('Achievement unlocked: ' + a.name);
+    if (++n % 2 === 0) refresh();
+    if (n % 200 === 0) save();
+  }, 50);
+  window.addEventListener('beforeunload', save);
+}
+window.claude?.hot?.snapshot?.(() => ({ save: serialize() }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
