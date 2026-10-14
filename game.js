@@ -100,6 +100,7 @@ function newGame() {
     phos: 0, carbon: 0, dense: 0, reach: 0,
     traits: {}, ach: {},
     lineage: 0,
+    linSpores: ZERO, lastWinterL: 0, // spores earned in this lineage; lineage reached before the last Winter
     rings: ZERO, ringsTotal: ZERO, ru: {}, growth: 0, seasonT: 0,
     biome: null, biomes: {},
     auto: { feed: true, col: true, trade: true, spor: false, mig: true },
@@ -265,7 +266,7 @@ const TRAITS = [
   { id: 'sniff',  lin: 3, cost: 1e11, name: 'Truffle scent',    desc: 'Truffle bonuses are tripled' },
   { id: 'sap',    lin: 3, cost: 1e12, name: 'Sap tap',          desc: 'Sugar you hold boosts nutrient production', eff: () => '×' + fmt(E.sap) },
   { id: 'ring',   lin: 4, cost: 1e14, name: 'Fairy ring',       desc: 'Nutrient production ^1.05' },
-  { id: 'autosp', lin: 5, cost: 1e16, name: 'Spore clock',      desc: 'Automatically Sporulate when it would at least double your spores' },
+  { id: 'autosp', lin: 5, cost: 1e16, name: 'Spore clock',      desc: 'Automatically Sporulate when it would at least double the spores earned this lineage' },
   { id: 'canopy', lin: 6, cost: 1e19, name: 'Canopy drop',      desc: 'Leaf litter bonuses are tripled' },
   { id: 'mat',    lin: 7, cost: 1e22, name: 'Mycelial mat',     desc: 'Nutrient production ^1.05 again' },
   { id: 'elder',  lin: 8, cost: 1e25, name: 'Elder network',    desc: 'Each lineage multiplies nutrients ×100 instead of ×10' },
@@ -318,10 +319,11 @@ function buyAllTrades() {
 }
 
 // ===== Lineage (second reset) =====
-const MIG = [3, 8, 11.5, 15, 18.5, 22, 24.5, 28.5, 34, 39]; // log10 spores needed to leave each lineage
+const MIG = [2.7, 8, 11.5, 15, 18.5, 22, 24.5, 28.5, 33, 37.5]; // log10 spores needed to leave each lineage
 const migReq = (L = G.lineage) => MIG[Math.min(L, MIG.length - 1)] + Math.max(0, L - MIG.length + 1) * 3;
 // The lineage your spores could carry you to right now
-function migTarget() { let L = G.lineage; while (G.spores.l >= migReq(L) - 1e-9 && L < G.lineage + 50) L++; return L; }
+// Counts spores earned this lineage, so spending on your genome never holds you back
+function migTarget() { let L = G.lineage; while (G.linSpores.l >= migReq(L) - 1e-9 && L < G.lineage + 50) L++; return L; }
 const LINEAGE = [
   [1, 'Sugar trades are kept when you Sporulate'],
   [2, 'Forests grow to 8 × 8, then one size larger every 2 lineages up to 11 × 11'],
@@ -337,10 +339,10 @@ const forestSize = () => G.biome === 'rain' ? 13 : 7 + Math.min(4, Math.floor(G.
 // ===== Winter (third reset): Tree rings and Old Growth =====
 const ringGainFor = L => L < 10 ? ZERO : N.of(2).pow(L - 10).mul(5).mul((hasR('heart') ? 2 : 1) * (done('taiga') ? 2 : 1)).floor();
 const OLD_GROWTH = [
-  { id: 'seed',    cost: 1,    name: 'Seed bank',      desc: 'Start every Winter with Fast germination, Hungry hyphae and Exploration' },
+  { id: 'seed',    cost: 1,    name: 'Seed bank',      desc: 'Start every Winter with all the starting genome traits' },
   { id: 'bark',    cost: 1,    name: 'Thick bark',     desc: 'Every tree ring you have ever earned boosts spores', eff: () => '×' + fmt(E.bark) },
   { id: 'seasons', cost: 3,    name: 'Turning year',   desc: 'Seasons begin. Spring, summer, autumn and winter each last a minute and bring their own bonuses' },
-  { id: 'head',    cost: 5,    name: 'Head start',     desc: 'Start every Winter at lineage 3' },
+  { id: 'head',    cost: 5,    name: 'Head start',     desc: 'Start every Winter at half the lineage you reached (at least 3)' },
   { id: 'cache',   cost: 10,   name: 'Spore cache',    desc: 'Spores from Sporulating ×100' },
   { id: 'annual',  cost: 25,   name: 'Annual growth',  desc: 'Each lineage gives ×3 more nutrients' },
   { id: 'automig', cost: 40,   name: 'Wanderlust',     desc: 'Automatically Migrate as soon as you can' },
@@ -363,10 +365,12 @@ function buyGrowth() {
   return true;
 }
 function resetForWinter() {
-  G.traits = hasR('seed') ? { germ: true, autof: true, autoc: true } : {};
+  G.traits = {};
+  if (hasR('seed')) for (const t of TRAITS) if (t.lin === 0) G.traits[t.id] = true;
+  G.linSpores = ZERO;
   G.dense = 0; G.reach = 0; G.spores = ZERO;
   G.sugar = ZERO; G.phos = 0; G.carbon = 0;
-  G.lineage = hasR('head') ? 3 : 0;
+  G.lineage = hasR('head') ? Math.max(3, Math.floor(G.lastWinterL / 2)) : 0;
   newForest();
 }
 function winter() {
@@ -374,6 +378,7 @@ function winter() {
   if (E.ringGain.lt(1)) return false;
   G.rings = G.rings.add(E.ringGain); G.ringsTotal = G.ringsTotal.add(E.ringGain);
   G.stats.winters++;
+  G.lastWinterL = G.lineage;
   G.biome = null;
   resetForWinter();
   return true;
@@ -390,17 +395,18 @@ const season = () => hasR('seasons') ? Math.floor(G.seasonT / 60) % 4 : -1;
 
 // ===== Biomes (fourth layer): challenge forests =====
 const BIOMES = {
-  taiga:   { name: 'Taiga',        goal: 17, rule: 'Cold ground: no leaf litter, and stone everywhere', reward: 'Tree rings ×2', weights: { litter: 0, stone: 25 } },
-  wetland: { name: 'Wetland',      goal: 17, rule: 'Waterlogged: water seeps everywhere, but no deadwood', reward: 'Water seep boosts ×2', weights: { wood: 0, seep: 22 } },
-  desert:  { name: 'Desert',       goal: 16, rule: 'Bone dry: no water seeps, and sugar ×0.01', reward: 'Sugar ×10', weights: { seep: 0 } },
-  rain:    { name: 'Rainforest',   goal: 18, rule: 'Huge 13 × 13 forests, but colonizing costs climb much faster', reward: 'Each lineage gives ×3 more nutrients' },
-  burnt:   { name: 'Burnt forest', goal: 14, rule: 'Your genome traits do nothing, except automation', reward: 'Genome traits cost ÷100' },
+  taiga:   { name: 'Taiga',        goal: 19, rule: 'Cold ground: no leaf litter, and stone everywhere', reward: 'Tree rings ×2', weights: { litter: 0, stone: 25 } },
+  wetland: { name: 'Wetland',      goal: 19, rule: 'Waterlogged: water seeps everywhere, but no deadwood', reward: 'Water seep boosts ×2', weights: { wood: 0, seep: 22 } },
+  desert:  { name: 'Desert',       goal: 18, rule: 'Bone dry: no water seeps, and sugar ×0.01', reward: 'Sugar ×10', weights: { seep: 0 } },
+  rain:    { name: 'Rainforest',   goal: 20, rule: 'Huge 13 × 13 forests, but colonizing costs climb much faster', reward: 'Each lineage gives ×3 more nutrients' },
+  burnt:   { name: 'Burnt forest', goal: 16, rule: 'Your genome traits do nothing, except automation', reward: 'Genome traits cost ÷100' },
 };
 // Entering a biome brings Winter early: you get any rings you've earned, then start the challenge
 function enterBiome(id) {
   if (!hasR('biomes') || !BIOMES[id] || done(id) || G.biome) return false;
   calc();
   if (E.ringGain.gte(1)) { G.rings = G.rings.add(E.ringGain); G.ringsTotal = G.ringsTotal.add(E.ringGain); G.stats.winters++; }
+  G.lastWinterL = Math.max(G.lastWinterL, G.lineage);
   G.biome = id;
   resetForWinter();
   return true;
@@ -420,6 +426,7 @@ function sporulate() {
   calc();
   if (E.sporeGain.lt(1)) return false;
   G.spores = G.spores.add(E.sporeGain);
+  G.linSpores = G.linSpores.add(E.sporeGain);
   G.stats.totalSpores = G.stats.totalSpores.add(E.sporeGain);
   G.stats.sporulations++;
   newForest();
@@ -431,7 +438,7 @@ function migrate() {
   const jumped = to - G.lineage;
   G.lineage = to;
   G.stats.migrations++;
-  G.spores = ZERO; // your genome (traits and upgrades) is kept
+  G.linSpores = ZERO; // your spores and genome are kept
   G.sugar = ZERO; G.phos = 0; G.carbon = 0;
   newForest();
   return jumped;
@@ -539,11 +546,11 @@ function tick(dt) {
   G.nut = G.nut.add(made);
   G.runEarned = G.runEarned.add(made);
   G.sugar = G.sugar.add(E.sugarGain.mul(dt));
-  if (has('drift')) G.spores = G.spores.add(E.sporeGain.mul(0.05 * dt));
+  if (has('drift')) { const d = E.sporeGain.mul(0.05 * dt); G.spores = G.spores.add(d); G.linSpores = G.linSpores.add(d); }
   if (G.auto.col && has('autoc')) colonizeCheapest();
   if (G.auto.feed && has('autof')) feedAll(400);
   if (G.auto.trade && G.lineage >= 4) buyAllTrades();
-  if (G.auto.spor && has('autosp') && G.stats.runTime > 5) { calc(); if (E.sporeGain.gte(G.spores.max(1))) sporulate(); }
+  if (G.auto.spor && has('autosp') && G.stats.runTime > 5) { calc(); if (E.sporeGain.gte(G.linSpores.max(1))) sporulate(); }
   if (G.auto.mig && hasR('automig') && migTarget() > G.lineage) migrate();
   const events = [];
   if (G.biome && G.lineage >= BIOMES[G.biome].goal) {
@@ -564,6 +571,8 @@ function deserialize(str) {
   if (!Array.isArray(d.grid) || !d.grid.length) throw new Error('No forest in this save');
   const g = newGame();
   for (const k of ['nut', 'sugar', 'spores', 'runEarned', 'rings', 'ringsTotal']) g[k] = N.load(d[k]);
+  g.linSpores = 'linSpores' in d ? N.load(d.linSpores) : g.spores; // older saves: count held spores
+  if (typeof d.lastWinterL === 'number') g.lastWinterL = d.lastWinterL;
   for (const k of ['size', 'seed', 'phos', 'carbon', 'dense', 'reach', 'lineage', 'growth', 'seasonT', 'last']) if (typeof d[k] === 'number') g[k] = d[k];
   g.biome = BIOMES[d.biome] ? d.biome : null;
   g.grid = d.grid.map(t => ({ t: TILES[t.t] ? t.t : 'loam', c: t.c ? 1 : 0, l: +t.l || 0 }));
@@ -578,6 +587,6 @@ function deserialize(str) {
 G = newGame();
 if (typeof module !== 'undefined') {
   module.exports = { N, fmt, newGame, calc, tick, E, get G() { return G; }, set G(v) { G = v; },
-    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, buyAllGenome, buyAllTrades, migTarget, sporulate, migrate, migReq, TRAITS, colonized,
+    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, buyAllGenome, buyAllTrades, migTarget, ringGainFor, sporulate, migrate, migReq, TRAITS, colonized,
     winter, buyOldGrowth, buyGrowth, growthCost, OLD_GROWTH, enterBiome, leaveBiome, BIOMES, allBiomes };
 }

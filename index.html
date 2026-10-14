@@ -482,15 +482,15 @@ function renderTab() {
     h += '</div>';
   } else if (tab === 'lineage') {
     const to = migTarget(), can = to > G.lineage;
-    h += `<p>Migrate on the wind to a larger forest. You spend all your spores and lose your forest, sugar and trades. <b>Your genome is kept.</b> Each lineage gives nutrients ×10, spores ×1.5, new genome traits and the perks below. With enough spores you can jump several lineages at once.</p>
-      <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${can ? to : G.lineage + 1}</button><span class="cost">${can ? (to - G.lineage > 1 ? 'jumps ' + (to - G.lineage) + ' lineages' : 'ready') : 'needs ' + fmt(N.lg(migReq())) + ' spores'}</span></div><div class="list">`;
+    h += `<p>Migrate on the wind to a larger forest. You lose your forest, sugar and trades. <b>Your spores and genome are kept.</b> What counts is spores <i>earned</i> in this lineage, so spending them on your genome never holds you back. Each lineage gives nutrients ×10, spores ×1.5, new genome traits and the perks below. With enough spores you can jump several lineages at once.</p>
+      <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${can ? to : G.lineage + 1}</button><span class="cost">${can ? (to - G.lineage > 1 ? 'jumps ' + (to - G.lineage) + ' lineages' : 'ready') : 'needs ' + fmt(N.lg(migReq())) + ' spores earned this lineage (' + fmt(G.linSpores) + ' so far)'}</span></div><div class="list">`;
     for (const [l, d] of LINEAGE) h += item('Lineage ' + l, d, '', G.lineage >= l ? '✓' : '', G.lineage >= l ? 'got' : '');
     h += '</div>';
   } else if (tab === 'winter') {
     const can = E.ringGain.gte(1);
     h += `<p>Let Winter come. Everything resets, including your genome and lineage, and you earn <b>tree rings</b>: 5 at lineage 10, doubling with every lineage after that. Rings buy permanent Old Growth upgrades.</p>
       <div class="winterhead"><button class="act big ringbtn ${can ? 'ready' : ''}" id="winter" ${can ? '' : 'disabled'}>Let Winter come</button>
-      <span class="cost">${can ? '+' + fmt(E.ringGain) + ' tree rings' : 'Reach lineage 10 first'}${G.biome ? ' · ends your biome attempt' : ''}</span></div>
+      <span class="cost">${can ? '+' + fmt(E.ringGain) + ' tree rings now · ' + fmt(ringGainFor(G.lineage + 1)) + ' at lineage ' + (G.lineage + 1) + ' · ' + fmt(ringGainFor(G.lineage + 3)) + ' at lineage ' + (G.lineage + 3) : 'Reach lineage 10 first'}${G.biome ? ' · ends your biome attempt' : ''}</span></div>
       <div class="list">`;
     h += item(`Growth rings <span class="cost">×${G.growth}</span>`, 'Nutrients ×10', '×' + fmt(E.growth),
       `<button class="act" id="growth" ${growthCost() > G.rings.l + 1e-9 ? 'disabled' : ''}>${fmt(N.lg(growthCost()))} rings</button>`);
@@ -575,7 +575,7 @@ function tabDots() {
   const dots = {
     trades: Object.keys(TRADES).some(id => tradeCost(id) <= G.sugar.l + 1e-9),
     genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !G.traits[t.id] && t.lin <= G.lineage && G.spores.gte(traitCost(t))),
-    lineage: G.spores.l >= migReq() - 1e-9,
+    lineage: migTarget() > G.lineage,
     winter: E.ringGain.gte(1) || OLD_GROWTH.some(u => !G.ru[u.id] && G.rings.gte(u.cost)),
   };
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('dot', !!dots[b.dataset.tab] && b.dataset.tab !== tab));
@@ -596,7 +596,7 @@ function refresh() {
   $('nut').textContent = fmt(G.nut); $('nutps').textContent = '+' + fmt(E.nutGain) + '/s';
   $('sug').textContent = fmt(G.sugar); $('sugps').textContent = '+' + fmt(E.sugarGain) + '/s';
   $('spo').textContent = fmt(G.spores); $('lin').textContent = 'Lineage ' + G.lineage;
-  $('linbar').style.width = Math.max(0, Math.min(100, (G.spores.zero ? 0 : G.spores.l / migReq()) * 100)) + '%';
+  $('linbar').style.width = Math.max(0, Math.min(100, (G.linSpores.zero ? 0 : G.linSpores.l / migReq()) * 100)) + '%';
   const winterOpen = G.lineage >= 10 || !G.ringsTotal.zero;
   $('ringchip').hidden = !winterOpen;
   $('rings').textContent = fmt(G.rings);
@@ -614,7 +614,7 @@ function refresh() {
   renderTile();
   const can = E.sporeGain.gte(1);
   $('sporulate').disabled = !can;
-  $('sporulate').classList.toggle('ready', can && E.sporeGain.gte(G.spores.add(1)));
+  $('sporulate').classList.toggle('ready', can && E.sporeGain.gte(G.linSpores.add(1)));
   $('sporebar').style.width = (can ? 100 : Math.max(0, Math.min(100, G.runEarned.l / 5 * 100))) + '%';
   $('sporetag').textContent = can ? '+' + fmt(E.sporeGain) + ' spores' : '';
   $('sporeinfo').textContent = can ? 'Earned ' + fmt(G.runEarned) + ' nutrients this run' : fmt(G.runEarned) + ' / ' + fmt(1e5) + ' nutrients made this run';
