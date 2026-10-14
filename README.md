@@ -1,4 +1,4 @@
-﻿# Wood Wide Web
+# Wood Wide Web
 
 An incremental game about a fungus spreading under a forest floor.
 
@@ -10,7 +10,9 @@ An incremental game about a fungus spreading under a forest floor.
 - **Loam** makes nutrients. **Deadwood** and **water seeps** multiply the tiles around them, so plan where you spread.
 - **Tree roots** pay you sugar. Trade it for big boosts.
 - **Sporulate** to start over in a new random forest and earn spores. Spend them on Genome traits.
-- **Migrate** to raise your Lineage: bigger forests, truffles, automation and huge multipliers. Lineage 10 is the ending.
+- **Migrate** to raise your Lineage: bigger forests, truffles, new genome traits and big multipliers. Your genome is kept.
+- At lineage 10, **let Winter come**: reset everything for **tree rings** and buy permanent Old Growth upgrades, including the turning seasons.
+- Unlock **Biomes**: five challenge forests with twisted rules. Complete all five to finish the game (roughly 6–8 hours).
 
 Your game saves in your browser automatically and keeps growing for up to 8 hours while you're away. Use Settings â†’ Export save to back it up or move it.
 

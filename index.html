@@ -11,7 +11,7 @@
 /* Layout: a glowing forest-floor cross-section on the left, a field ledger of actions on the right; stacks on phones. */
 :root {
   --bg: #15110d; --bg2: #1f1812; --panel: #241c15; --line: #3f3226; --fg: #f1e8d6; --dim: #ab9b8b;
-  --nut: #f0b452; --sugar: #ef8fa6; --spore: #7fdcc8; --hypha: #fff3dc;
+  --nut: #f0b452; --ring: #d99a5b; --sugar: #ef8fa6; --spore: #7fdcc8; --hypha: #fff3dc;
   --glow1: rgba(127, 220, 200, .10); --glow2: rgba(240, 180, 82, .08); --shade: rgba(0, 0, 0, .55);
   --frame: #0f0b08; --cap: #c8553d; --capdot: #f6e7cf; --stem: #eadfc8; --blend: lighter;
   --loam: #4b3524; --litter: #85622a; --wood: #5e3b29; --root: #74494b; --seep: #2a5560; --stone: #57534d; --truffle: #45304d;
@@ -23,7 +23,7 @@
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --bg: #efe5d3; --bg2: #e6d9c2; --panel: #f9f3e8; --line: #d8c7ae; --fg: #2a1f16; --dim: #6f5f4e;
-  --nut: #a96a0c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
+  --nut: #a96a0c; --ring: #8a4f1c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
   --glow1: rgba(31, 127, 109, .10); --glow2: rgba(169, 106, 12, .10); --shade: rgba(60, 40, 20, .25);
   --frame: #4a3727; --cap: #b2442d; --capdot: #fff6e6; --stem: #f3ead8; --blend: source-over;
   --loam: #8a6a4c; --litter: #b88f45; --wood: #8a5a3e; --root: #a06c6b; --seep: #4f8c98; --stone: #8f8a82; --truffle: #7a5a86;
@@ -32,7 +32,7 @@
 } }
 :root[data-theme="light"] {
   --bg: #efe5d3; --bg2: #e6d9c2; --panel: #f9f3e8; --line: #d8c7ae; --fg: #2a1f16; --dim: #6f5f4e;
-  --nut: #a96a0c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
+  --nut: #a96a0c; --ring: #8a4f1c; --sugar: #b43f5d; --spore: #1f7f6d; --hypha: #6b5440;
   --glow1: rgba(31, 127, 109, .10); --glow2: rgba(169, 106, 12, .10); --shade: rgba(60, 40, 20, .25);
   --frame: #4a3727; --cap: #b2442d; --capdot: #fff6e6; --stem: #f3ead8; --blend: source-over;
   --loam: #8a6a4c; --litter: #b88f45; --wood: #8a5a3e; --root: #a06c6b; --seep: #4f8c98; --stone: #8f8a82; --truffle: #7a5a86;
@@ -59,7 +59,19 @@ h1 { font: 800 32px/1 var(--display); margin: 0; letter-spacing: -0.02em; text-w
 .chip svg { width: 26px; height: 26px; flex: none; }
 .chip b { display: block; font: 600 20px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
 .chip small { display: block; font: 12px var(--mono); color: var(--dim); }
-.c-nut { color: var(--nut); } .c-sug { color: var(--sugar); } .c-spo { color: var(--spore); }
+.c-nut { color: var(--nut); } .c-sug { color: var(--sugar); } .c-spo { color: var(--spore); } .c-ring { color: var(--ring); }
+.chip.c-ring b { color: inherit; }
+.season { font: 700 13px var(--body); padding: 8px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; }
+.season small { font: 12px var(--mono); color: var(--dim); font-weight: 400; }
+body[data-season="0"] { --glow1: rgba(140, 220, 120, .13); }
+body[data-season="1"] { --glow2: rgba(255, 196, 70, .16); }
+body[data-season="2"] { --glow1: rgba(230, 120, 50, .14); --glow2: rgba(200, 90, 40, .12); }
+body[data-season="3"] { --glow1: rgba(170, 210, 255, .14); --glow2: rgba(200, 220, 255, .08); }
+.biomebar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--ring); background: color-mix(in srgb, var(--ring) 12%, var(--panel)); max-width: 600px; }
+.biomebar b { font: 800 16px var(--display); color: var(--ring); }
+.winterhead { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+button.big.ringbtn { border-color: var(--ring); color: var(--ring); }
 .chip.c-nut b, .chip.c-sug b, .chip.c-spo b { color: inherit; }
 .meter { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 4px; }
 .meter i { display: block; height: 100%; width: 0; background: currentColor; border-radius: 4px; transition: width .3s; }
@@ -172,9 +184,15 @@ textarea { width: 100%; min-height: 70px; background: var(--bg); color: var(--fg
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3" fill="currentColor"/><circle cx="16" cy="8" r="2" fill="currentColor" opacity=".7"/><circle cx="14" cy="16" r="3.5" fill="currentColor" opacity=".85"/><circle cx="6" cy="17" r="1.6" fill="currentColor" opacity=".5"/></svg>
       <div><b id="spo">0</b><small id="lin">Lineage 0</small><div class="meter" title="Progress to the next Migrate"><i id="linbar"></i></div></div>
     </div>
+    <div class="chip c-ring" id="ringchip" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".75"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      <div><b id="rings">0</b><small id="ringsub">tree rings</small></div>
+    </div>
+    <div class="season" id="seasonchip" hidden><span id="seasonname">Spring</span><small id="seasondesc"></small></div>
   </header>
   <main>
     <section>
+      <div class="biomebar" id="biomebar" hidden></div>
       <div class="forest"><div id="grid" role="grid" aria-label="Forest floor"></div><canvas id="threads"></canvas></div>
       <div class="legend">
         <span><i class="t-loam"></i>Loam</span><span><i class="t-litter"></i>Leaf litter</span><span><i class="t-wood"></i>Deadwood</span>
@@ -201,6 +219,8 @@ textarea { width: 100%; min-height: 70px; background: var(--bg); color: var(--fg
           <button data-tab="trades" class="on">Sugar trades</button>
           <button data-tab="genome">Genome</button>
           <button data-tab="lineage">Lineage</button>
+          <button data-tab="winter" hidden>Winter</button>
+          <button data-tab="biomes" hidden>Biomes</button>
           <button data-tab="ach">Achievements</button>
           <button data-tab="opts">Settings</button>
         </nav>
@@ -455,7 +475,7 @@ function renderTab() {
         continue;
       }
       const own = has(t.id), sw = TRAIT_SWITCH[t.id];
-      const btn = !own ? `<button class="act" data-trait="${t.id}" ${G.spores.lt(t.cost) ? 'disabled' : ''}>${fmt(t.cost)} spores</button>`
+      const btn = !own ? `<button class="act" data-trait="${t.id}" ${G.spores.lt(traitCost(t)) ? 'disabled' : ''}>${fmt(traitCost(t))} spores</button>`
         : sw ? `<button class="act" data-switch="${sw}" aria-pressed="${G.auto[sw]}">${G.auto[sw] ? 'On' : 'Off'}</button>` : null;
       h += item(t.name, t.desc, own && t.eff ? t.eff() : '', btn, own ? 'got' : '');
     }
@@ -465,6 +485,32 @@ function renderTab() {
     h += `<p>Migrate on the wind to a larger forest. You spend all your spores and lose your forest, sugar and trades. <b>Your genome is kept.</b> Each lineage gives nutrients ×10, spores ×1.5, new genome traits and the perks below. With enough spores you can jump several lineages at once.</p>
       <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${can ? to : G.lineage + 1}</button><span class="cost">${can ? (to - G.lineage > 1 ? 'jumps ' + (to - G.lineage) + ' lineages' : 'ready') : 'needs ' + fmt(N.lg(migReq())) + ' spores'}</span></div><div class="list">`;
     for (const [l, d] of LINEAGE) h += item('Lineage ' + l, d, '', G.lineage >= l ? '✓' : '', G.lineage >= l ? 'got' : '');
+    h += '</div>';
+  } else if (tab === 'winter') {
+    const can = E.ringGain.gte(1);
+    h += `<p>Let Winter come. Everything resets, including your genome and lineage, and you earn <b>tree rings</b>: 5 at lineage 10, doubling with every lineage after that. Rings buy permanent Old Growth upgrades.</p>
+      <div class="winterhead"><button class="act big ringbtn ${can ? 'ready' : ''}" id="winter" ${can ? '' : 'disabled'}>Let Winter come</button>
+      <span class="cost">${can ? '+' + fmt(E.ringGain) + ' tree rings' : 'Reach lineage 10 first'}${G.biome ? ' · ends your biome attempt' : ''}</span></div>
+      <div class="list">`;
+    h += item(`Growth rings <span class="cost">×${G.growth}</span>`, 'Nutrients ×10', '×' + fmt(E.growth),
+      `<button class="act" id="growth" ${growthCost() > G.rings.l + 1e-9 ? 'disabled' : ''}>${fmt(N.lg(growthCost()))} rings</button>`);
+    for (const u of OLD_GROWTH) {
+      const own = hasR(u.id);
+      const btn = !own ? `<button class="act" data-og="${u.id}" ${G.rings.lt(u.cost) ? 'disabled' : ''}>${fmt(u.cost)} rings</button>`
+        : u.id === 'automig' ? `<button class="act" data-switch="mig" aria-pressed="${G.auto.mig}">${G.auto.mig ? 'On' : 'Off'}</button>` : null;
+      h += item(u.name, u.desc, own && u.eff ? u.eff() : '', btn, own ? 'got' : '');
+    }
+    h += '</div>';
+  } else if (tab === 'biomes') {
+    const n = Object.keys(G.biomes).length;
+    h += `<p>Challenge forests with twisted rules. Entering one brings Winter early: you collect any tree rings you've earned, then start over inside the biome. Reach its goal lineage to finish it for a permanent reward. ${n} of 5 complete. Finish all five to complete Wood Wide Web.</p>`;
+    if (G.biome) h += `<div class="row" style="margin-bottom:12px"><button class="act" id="leavebiome">Leave ${BIOMES[G.biome].name}</button><span class="cost">You keep your progress but lose the challenge</span></div>`;
+    h += '<div class="list">';
+    for (const [id, b] of Object.entries(BIOMES)) {
+      const btn = done(id) ? '✓' : G.biome === id ? '<span class="cost">In progress</span>'
+        : `<button class="act" data-biome="${id}" ${G.biome ? 'disabled' : ''}>Enter</button>`;
+      h += item(`${b.name} <span class="cost">goal: lineage ${b.goal}</span>`, b.rule, 'Reward: ' + b.reward, btn, done(id) ? 'got' : '');
+    }
     h += '</div>';
   } else if (tab === 'ach') {
     const n = Object.keys(G.ach).length;
@@ -476,7 +522,8 @@ function renderTab() {
       <label><input type="checkbox" id="af" ${G.auto.feed ? 'checked' : ''}> Auto-feed</label>
       <label><input type="checkbox" id="ac" ${G.auto.col ? 'checked' : ''}> Auto-colonize</label>
       <label><input type="checkbox" id="at" ${G.auto.trade ? 'checked' : ''}> Auto-trade</label>
-      <label><input type="checkbox" id="as" ${G.auto.spor ? 'checked' : ''}> Auto-sporulate</label></div>
+      <label><input type="checkbox" id="as" ${G.auto.spor ? 'checked' : ''}> Auto-sporulate</label>
+      <label><input type="checkbox" id="am" ${G.auto.mig ? 'checked' : ''}> Auto-migrate</label></div>
       <dl class="kv"><dt>Time played</dt><dd>${fmtTime(G.stats.time)}</dd><dt>This forest</dt><dd>${fmtTime(G.stats.runTime)}</dd>
       <dt>Sporulations</dt><dd>${G.stats.sporulations}</dd><dt>Most nutrients</dt><dd>${fmt(G.stats.best)}</dd></dl>
       <div class="row" style="margin-top:12px"><button class="act" id="exp">Export save</button><button class="act" id="imp">Import save</button><button class="act" id="wipe">Wipe save</button></div>
@@ -492,10 +539,16 @@ function bindTab() {
   body.querySelectorAll('[data-trait]').forEach(b => b.onclick = () => { if (buyTrait(b.dataset.trait)) { floatAt(b, 'Evolved!', 'spo'); burst(b, 50); } refresh(); });
   body.querySelectorAll('[data-switch]').forEach(b => b.onclick = () => { G.auto[b.dataset.switch] = !G.auto[b.dataset.switch]; refresh(); });
   if ($('migrate')) $('migrate').onclick = e => { const b = e.target, n = migrate(); if (n) { burst(b, 300); sel = -1; toast((n > 1 ? `Jumped ${n} lineages! ` : '') + 'Your spores settled in a new forest. Lineage ' + G.lineage + '.'); refresh(); } };
+  if ($('winter')) $('winter').onclick = e => { const g = E.ringGain; if (winter()) { burst(e.target, 400); sel = -1; toast('Winter came. You earned ' + fmt(g) + ' tree rings.'); refresh(); } };
+  if ($('growth')) $('growth').onclick = e => { if (buyGrowth()) floatAt(e.target, '×10', 'nut'); refresh(); };
+  body.querySelectorAll('[data-og]').forEach(b => b.onclick = () => { if (buyOldGrowth(b.dataset.og)) { floatAt(b, 'Grown!', 'nut'); burst(b, 60); } refresh(); });
+  body.querySelectorAll('[data-biome]').forEach(b => b.onclick = () => { if (enterBiome(b.dataset.biome)) { burst(b, 200); sel = -1; toast('You entered the ' + BIOMES[G.biome].name + '. Reach lineage ' + BIOMES[G.biome].goal + '.'); refresh(); } });
+  if ($('leavebiome')) $('leavebiome').onclick = () => { leaveBiome(); sel = -1; refresh(); };
   if ($('buyallgenome')) $('buyallgenome').onclick = e => { const n = buyAllGenome(); if (n) { floatAt(e.target, '+' + n + ' bought', 'spo'); burst(e.target, 40); } refresh(); };
   if ($('buyalltrades')) $('buyalltrades').onclick = e => { const n = buyAllTrades(); if (n) floatAt(e.target, '+' + n + ' trades', 'sug'); refresh(); };
   if ($('af')) {
     $('as').onchange = e => G.auto.spor = e.target.checked;
+    $('am').onchange = e => G.auto.mig = e.target.checked;
     $('af').onchange = e => G.auto.feed = e.target.checked;
     $('ac').onchange = e => G.auto.col = e.target.checked;
     $('at').onchange = e => G.auto.trade = e.target.checked;
@@ -510,16 +563,20 @@ function tabSignature() {
   if (tab === 'opts') return 'opts';
   if (tab === 'trades') return [G.phos, G.carbon, ...Object.keys(TRADES).map(id => tradeCost(id) <= G.sugar.l + 1e-9)].join();
   if (tab === 'genome') return [G.dense, G.reach, Object.keys(G.traits).join(), ...Object.keys(GENES).map(id => geneCost(id) <= G.spores.l + 1e-9),
-    ...TRAITS.map(t => G.spores.gte(t.cost)), G.auto.feed, G.auto.col, G.auto.spor, G.lineage].join();
+    ...TRAITS.map(t => G.spores.gte(traitCost(t))), G.auto.feed, G.auto.col, G.auto.spor, G.lineage].join();
   if (tab === 'lineage') return [G.lineage, migTarget()].join();
+  if (tab === 'winter') return [fmt(E.ringGain), fmt(G.rings), Object.keys(G.ru).join(), G.growth, G.auto.mig, G.biome,
+    growthCost() <= G.rings.l + 1e-9, ...OLD_GROWTH.map(u => G.rings.gte(u.cost))].join();
+  if (tab === 'biomes') return [G.biome, Object.keys(G.biomes).join()].join();
   return Object.keys(G.ach).length + tab;
 }
 // A dot on a tab means something in it is ready
 function tabDots() {
   const dots = {
     trades: Object.keys(TRADES).some(id => tradeCost(id) <= G.sugar.l + 1e-9),
-    genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !has(t.id) && t.lin <= G.lineage && G.spores.gte(t.cost)),
+    genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !G.traits[t.id] && t.lin <= G.lineage && G.spores.gte(traitCost(t))),
     lineage: G.spores.l >= migReq() - 1e-9,
+    winter: E.ringGain.gte(1) || OLD_GROWTH.some(u => !G.ru[u.id] && G.rings.gte(u.cost)),
   };
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('dot', !!dots[b.dataset.tab] && b.dataset.tab !== tab));
 }
@@ -540,6 +597,19 @@ function refresh() {
   $('sug').textContent = fmt(G.sugar); $('sugps').textContent = '+' + fmt(E.sugarGain) + '/s';
   $('spo').textContent = fmt(G.spores); $('lin').textContent = 'Lineage ' + G.lineage;
   $('linbar').style.width = Math.max(0, Math.min(100, (G.spores.zero ? 0 : G.spores.l / migReq()) * 100)) + '%';
+  const winterOpen = G.lineage >= 10 || !G.ringsTotal.zero;
+  $('ringchip').hidden = !winterOpen;
+  $('rings').textContent = fmt(G.rings);
+  $('ringsub').textContent = E.ringGain.gte(1) ? '+' + fmt(E.ringGain) + ' at Winter' : 'tree rings';
+  const sn = E.season;
+  $('seasonchip').hidden = sn < 0;
+  document.body.dataset.season = sn;
+  if (sn >= 0) { $('seasonname').textContent = SEASONS[sn].name + ' · ' + Math.ceil(60 - G.seasonT % 60) + 's'; $('seasondesc').textContent = SEASONS[sn].desc; }
+  document.querySelector('[data-tab="winter"]').hidden = !winterOpen;
+  document.querySelector('[data-tab="biomes"]').hidden = !hasR('biomes');
+  const bb = $('biomebar');
+  bb.hidden = !G.biome;
+  if (G.biome) { const b = BIOMES[G.biome], txt = `<b>${b.name}</b><span>${b.rule}</span><span class="cost">Goal: lineage ${b.goal} (now ${G.lineage}) · Reward: ${b.reward}</span>`; if (bb.innerHTML !== txt) bb.innerHTML = txt; }
   renderGrid();
   renderTile();
   const can = E.sporeGain.gte(1);
@@ -560,7 +630,7 @@ function start(data) {
   let last = performance.now(), n = 0;
   setInterval(() => {
     const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
-    for (const a of tick(dt)) toast('Achievement unlocked: ' + a.name);
+    for (const a of tick(dt)) { toast(a.biome ? a.name : 'Achievement unlocked: ' + a.name); if (a.biome) { burst($('biomebar'), 300); tabSig = ''; } }
     if (++n % 2 === 0) refresh();
     if (n % 200 === 0) save();
   }, 50);

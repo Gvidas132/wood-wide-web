@@ -100,21 +100,28 @@ function newGame() {
     phos: 0, carbon: 0, dense: 0, reach: 0,
     traits: {}, ach: {},
     lineage: 0,
-    auto: { feed: true, col: true, trade: true, spor: false },
-    stats: { time: 0, runTime: 0, sporulations: 0, migrations: 0, best: ZERO, totalSpores: ZERO },
+    rings: ZERO, ringsTotal: ZERO, ru: {}, growth: 0, seasonT: 0,
+    biome: null, biomes: {},
+    auto: { feed: true, col: true, trade: true, spor: false, mig: true },
+    stats: { time: 0, runTime: 0, sporulations: 0, migrations: 0, winters: 0, best: ZERO, totalSpores: ZERO },
     last: Date.now(),
   };
   g.seed = (Math.random() * 2 ** 31) | 0;
-  g.grid = makeForest(g.seed, g.size, 0);
+  g.grid = makeForest(g.seed, g.size, 0, null);
   return g;
 }
 let G;
 const E = {}; // derived values, refreshed by calc()
-const has = id => !!G.traits[id];
+// In the Burnt forest biome, genome traits stop working except automation
+const AUTO_TRAITS = ['autof', 'autoc', 'autosp'];
+const has = id => !!G.traits[id] && !(G.biome === 'burnt' && !AUTO_TRAITS.includes(id));
+const hasR = id => !!G.ru[id];
+const done = id => !!G.biomes[id];
 
-function makeForest(seed, size, lineage) {
+function makeForest(seed, size, lineage, biome) {
   const r = rng(seed);
-  const pool = Object.entries(TILES).map(([k, v]) => [k, k === 'truffle' ? (lineage >= 3 ? 4 : 0) : v.w]);
+  const over = (biome && BIOMES[biome].weights) || {};
+  const pool = Object.entries(TILES).map(([k, v]) => [k, k in over ? over[k] : k === 'truffle' ? (lineage >= 3 ? 4 : 0) : v.w]);
   const total = pool.reduce((a, p) => a + p[1], 0);
   const grid = [];
   for (let i = 0; i < size * size; i++) {
@@ -126,7 +133,7 @@ function makeForest(seed, size, lineage) {
   grid[mid] = { t: 'loam', c: 1, l: 1 };
   // Guarantee a fair start: deadwood beside the start, a root two steps away
   const near = neighbors4(mid, size);
-  grid[near[Math.floor(r() * near.length)]].t = 'wood';
+  grid[near[Math.floor(r() * near.length)]].t = over.wood === 0 ? 'seep' : 'wood';
   const two = [mid - 2, mid + 2, mid - 2 * size, mid + 2 * size];
   grid[two[Math.floor(r() * 4)]].t = 'root';
   for (const i of near) if (grid[i].t === 'stone') grid[i].t = 'loam';
@@ -153,10 +160,11 @@ function neighbors8(i, size) {
 // ===== Costs =====
 function scaled(l, S) { return l < S ? l : l + (l - S) * (l - S) / S; }
 const colonized = () => G.grid.reduce((a, t) => a + t.c, 0);
-function colRatio() { return 2.4 - (has('rhizo') ? 0.4 : 0) - (G.lineage >= 6 ? 0.2 : 0); }
+function colRatio() { return 2.4 - (has('rhizo') ? 0.4 : 0) - (G.lineage >= 6 ? 0.2 : 0) + (G.biome === 'rain' ? 0.4 : 0); }
+const springCut = () => season() === 0 ? 1 : 0; // spring: colonizing and feeding cost ÷10
 function colCost(i) { // log10
   const n = colonized();
-  return Math.log10(15) + Math.log10(colRatio()) * scaled(n - 1, 40) + (G.grid[i].t === 'stone' ? 2 : 0);
+  return Math.log10(15) + Math.log10(colRatio()) * scaled(n - 1, 40) + (G.grid[i].t === 'stone' ? 2 : 0) - springCut();
 }
 function canColonize(i) {
   const t = G.grid[i];
@@ -175,7 +183,7 @@ function colonize(i) {
 const feedable = t => t.c && t.t !== 'stone';
 const feedScaleStart = () => 60 + 25 * G.reach;
 function feedCost(t, l = t.l) { // log10 price to go from level l to l+1
-  return TILES[t.t].cost + Math.log10(1.5) * scaled(l - 1, feedScaleStart()) - G.carbon * Math.log10(2);
+  return TILES[t.t].cost + Math.log10(1.5) * scaled(l - 1, feedScaleStart()) - G.carbon * Math.log10(2) - springCut();
 }
 function maxLevel(costFn, cur, res) { // highest level count reachable with resource log10 `res`
   res += 1e-9;
@@ -262,10 +270,11 @@ const TRAITS = [
   { id: 'mat',    lin: 7, cost: 1e22, name: 'Mycelial mat',     desc: 'Nutrient production ^1.05 again' },
   { id: 'elder',  lin: 8, cost: 1e25, name: 'Elder network',    desc: 'Each lineage multiplies nutrients ×100 instead of ×10' },
 ];
+const traitCost = t => t.cost / (hasR('old') ? 10 : 1) / (done('burnt') ? 100 : 1);
 function buyTrait(id) {
   const t = TRAITS.find(x => x.id === id);
-  if (!t || G.traits[id] || G.lineage < t.lin || G.spores.lt(t.cost)) return false;
-  G.spores = G.spores.sub(t.cost); G.traits[id] = true;
+  if (!t || G.traits[id] || G.lineage < t.lin || G.spores.lt(traitCost(t))) return false;
+  G.spores = G.spores.sub(traitCost(t)); G.traits[id] = true;
   return true;
 }
 
@@ -310,7 +319,7 @@ function buyAllTrades() {
 
 // ===== Lineage (second reset) =====
 const MIG = [3, 8, 11.5, 15, 18.5, 22, 24.5, 28.5, 34, 39]; // log10 spores needed to leave each lineage
-const migReq = (L = G.lineage) => MIG[Math.min(L, MIG.length - 1)] + Math.max(0, L - MIG.length + 1) * 4;
+const migReq = (L = G.lineage) => MIG[Math.min(L, MIG.length - 1)] + Math.max(0, L - MIG.length + 1) * 3;
 // The lineage your spores could carry you to right now
 function migTarget() { let L = G.lineage; while (G.spores.l >= migReq(L) - 1e-9 && L < G.lineage + 50) L++; return L; }
 const LINEAGE = [
@@ -321,15 +330,89 @@ const LINEAGE = [
   [6, 'Colonizing gets more expensive more slowly (−0.2)'],
   [7, 'Spores from Sporulating ×3'],
   [8, 'Nutrient production ^1.05'],
-  [10, 'The forest is one network. You finished Wood Wide Web; keep growing if you like'],
+  [10, 'Winter can come: reset everything for Tree rings and permanent Old Growth upgrades'],
 ];
-const forestSize = () => 7 + Math.min(4, Math.floor(G.lineage / 2));
+const forestSize = () => G.biome === 'rain' ? 13 : 7 + Math.min(4, Math.floor(G.lineage / 2));
+
+// ===== Winter (third reset): Tree rings and Old Growth =====
+const ringGainFor = L => L < 10 ? ZERO : N.of(2).pow(L - 10).mul(5).mul((hasR('heart') ? 2 : 1) * (done('taiga') ? 2 : 1)).floor();
+const OLD_GROWTH = [
+  { id: 'seed',    cost: 1,    name: 'Seed bank',      desc: 'Start every Winter with Fast germination, Hungry hyphae and Exploration' },
+  { id: 'bark',    cost: 1,    name: 'Thick bark',     desc: 'Every tree ring you have ever earned boosts spores', eff: () => '×' + fmt(E.bark) },
+  { id: 'seasons', cost: 3,    name: 'Turning year',   desc: 'Seasons begin. Spring, summer, autumn and winter each last a minute and bring their own bonuses' },
+  { id: 'head',    cost: 5,    name: 'Head start',     desc: 'Start every Winter at lineage 3' },
+  { id: 'cache',   cost: 10,   name: 'Spore cache',    desc: 'Spores from Sporulating ×100' },
+  { id: 'annual',  cost: 25,   name: 'Annual growth',  desc: 'Each lineage gives ×3 more nutrients' },
+  { id: 'automig', cost: 40,   name: 'Wanderlust',     desc: 'Automatically Migrate as soon as you can' },
+  { id: 'old',     cost: 80,   name: 'Old seeds',      desc: 'Genome traits cost ÷10' },
+  { id: 'hollow',  cost: 150,  name: 'Hollow logs',    desc: 'Deadwood boosts ×1.5' },
+  { id: 'biomes',  cost: 1000, name: 'Wanderers',      desc: 'Unlock Biomes: challenge forests with permanent rewards' },
+  { id: 'heart',   cost: 5000, name: 'Heartwood',      desc: 'Tree rings from Winter ×2' },
+  { id: 'ancient', cost: 3e4,  name: 'Ancient forest', desc: 'Nutrient production ^1.05' },
+];
+const growthCost = (l = G.growth) => Math.log10(2) + Math.log10(2) * scaled(l, 25); // 2 rings, then doubling
+function buyOldGrowth(id) {
+  const u = OLD_GROWTH.find(x => x.id === id);
+  if (!u || G.ru[id] || G.rings.lt(u.cost)) return false;
+  G.rings = G.rings.sub(u.cost); G.ru[id] = true;
+  return true;
+}
+function buyGrowth() {
+  if (growthCost() > G.rings.l + 1e-9) return false;
+  G.rings = G.rings.sub(N.lg(growthCost())); G.growth++;
+  return true;
+}
+function resetForWinter() {
+  G.traits = hasR('seed') ? { germ: true, autof: true, autoc: true } : {};
+  G.dense = 0; G.reach = 0; G.spores = ZERO;
+  G.sugar = ZERO; G.phos = 0; G.carbon = 0;
+  G.lineage = hasR('head') ? 3 : 0;
+  newForest();
+}
+function winter() {
+  calc();
+  if (E.ringGain.lt(1)) return false;
+  G.rings = G.rings.add(E.ringGain); G.ringsTotal = G.ringsTotal.add(E.ringGain);
+  G.stats.winters++;
+  G.biome = null;
+  resetForWinter();
+  return true;
+}
+
+// The year: 0 spring, 1 summer, 2 autumn, 3 winter (60 seconds each), once Turning year is bought
+const SEASONS = [
+  { name: 'Spring', desc: 'Colonizing and feeding cost ÷10' },
+  { name: 'Summer', desc: 'Nutrients ×5' },
+  { name: 'Autumn', desc: 'Spores ×3 and leaf litter ×3' },
+  { name: 'Winter', desc: 'Sugar ×10, nutrients ×0.5' },
+];
+const season = () => hasR('seasons') ? Math.floor(G.seasonT / 60) % 4 : -1;
+
+// ===== Biomes (fourth layer): challenge forests =====
+const BIOMES = {
+  taiga:   { name: 'Taiga',        goal: 17, rule: 'Cold ground: no leaf litter, and stone everywhere', reward: 'Tree rings ×2', weights: { litter: 0, stone: 25 } },
+  wetland: { name: 'Wetland',      goal: 17, rule: 'Waterlogged: water seeps everywhere, but no deadwood', reward: 'Water seep boosts ×2', weights: { wood: 0, seep: 22 } },
+  desert:  { name: 'Desert',       goal: 16, rule: 'Bone dry: no water seeps, and sugar ×0.01', reward: 'Sugar ×10', weights: { seep: 0 } },
+  rain:    { name: 'Rainforest',   goal: 18, rule: 'Huge 13 × 13 forests, but colonizing costs climb much faster', reward: 'Each lineage gives ×3 more nutrients' },
+  burnt:   { name: 'Burnt forest', goal: 14, rule: 'Your genome traits do nothing, except automation', reward: 'Genome traits cost ÷100' },
+};
+// Entering a biome brings Winter early: you get any rings you've earned, then start the challenge
+function enterBiome(id) {
+  if (!hasR('biomes') || !BIOMES[id] || done(id) || G.biome) return false;
+  calc();
+  if (E.ringGain.gte(1)) { G.rings = G.rings.add(E.ringGain); G.ringsTotal = G.ringsTotal.add(E.ringGain); G.stats.winters++; }
+  G.biome = id;
+  resetForWinter();
+  return true;
+}
+function leaveBiome() { if (!G.biome) return false; G.biome = null; newForest(); return true; }
+const allBiomes = () => Object.keys(BIOMES).every(done);
 
 // ===== Resets =====
 function newForest() {
   G.seed = (G.seed * 1103515245 + 12345) & 0x7fffffff;
   G.size = forestSize();
-  G.grid = makeForest(G.seed, G.size, G.lineage);
+  G.grid = makeForest(G.seed, G.size, G.lineage, G.biome);
   G.nut = ZERO; G.runEarned = ZERO; G.stats.runTime = 0;
   if (G.lineage < 1) { G.sugar = ZERO; G.phos = 0; G.carbon = 0; }
 }
@@ -373,7 +456,14 @@ const ACHS = [
   { id: 'n100', name: 'Old growth', desc: 'Hold 1.00e100 nutrients', ok: () => G.nut.l >= 100 },
   { id: 'l5', name: 'Five generations', desc: 'Reach lineage 5', ok: () => G.lineage >= 5 },
   { id: 'n308', name: 'Deeper than floats', desc: 'Hold 1.80e308 nutrients', ok: () => G.nut.l >= 308.2547 },
-  { id: 'www', name: 'Wood Wide Web', desc: 'Reach lineage 10', ok: () => G.lineage >= 10 },
+  { id: 'l10', name: 'Ten generations', desc: 'Reach lineage 10', ok: () => G.lineage >= 10 },
+  { id: 'winter', name: 'First frost', desc: 'Let Winter come', ok: () => G.stats.winters > 0 },
+  { id: 'year', name: 'A full year', desc: 'Unlock the seasons', ok: () => hasR('seasons') },
+  { id: 'r100', name: 'Old tree', desc: 'Earn 100 tree rings in total', ok: () => G.ringsTotal.l >= 2 },
+  { id: 'l20', name: 'Twenty generations', desc: 'Reach lineage 20', ok: () => G.lineage >= 20 },
+  { id: 'biome1', name: 'Explorer', desc: 'Complete a biome', ok: () => Object.keys(G.biomes).length >= 1 },
+  { id: 'n1000', name: 'Bottomless', desc: 'Hold 1.00e1,000 nutrients', ok: () => G.nut.l >= 1000 },
+  { id: 'www', name: 'Wood Wide Web', desc: 'Complete every biome', ok: () => allBiomes() },
 ];
 function checkAchs() {
   const got = [];
@@ -388,8 +478,8 @@ function tileMults(i) {
   for (const j of neighbors8(i, G.size)) {
     const n = G.grid[j];
     if (!n.c) continue;
-    if (n.t === 'wood') wood += (0.5 + 0.15 * n.l) * (has('enzyme') ? 2 : 1);
-    else if (n.t === 'seep') seep += (0.25 + 0.08 * n.l) * (has('deep') ? 3 : 1);
+    if (n.t === 'wood') wood += (0.5 + 0.15 * n.l) * (has('enzyme') ? 2 : 1) * (hasR('hollow') ? 1.5 : 1);
+    else if (n.t === 'seep') seep += (0.25 + 0.08 * n.l) * (has('deep') ? 3 : 1) * (done('wetland') ? 2 : 1);
   }
   return { wood, seep };
 }
@@ -413,26 +503,33 @@ function calc() {
   }
   const n = colonized();
   E.colonized = n;
-  const litter = E.litter = N.of(1 + 0.1 * litterLv * (has('canopy') ? 3 : 1));
+  const sn = E.season = season();
+  const litter = E.litter = N.of(1 + 0.1 * litterLv * (has('canopy') ? 3 : 1) * (sn === 2 ? 3 : 1));
   E.stone = N.of(1.5).pow(stones);
   E.phos = N.of(2).pow(G.phos);
   E.germ = has('germ') ? G.spores.add(1).pow(0.15) : ONE;
   E.fusion = has('fusion') ? N.of(1.04).pow(n) : ONE;
   E.ach = N.of(1.05).pow(Object.keys(G.ach).length);
-  E.lin = N.of(has('elder') ? 100 : LIN_MULT).pow(G.lineage);
+  E.lin = N.of((has('elder') ? 100 : LIN_MULT) * (hasR('annual') ? 3 : 1) * (done('rain') ? 3 : 1)).pow(G.lineage);
+  E.bark = hasR('bark') ? G.ringsTotal.add(1) : ONE;
+  E.growth = N.of(10).pow(G.growth);
+  E.seasonMult = N.of(sn === 1 ? 5 : sn === 3 ? 0.5 : 1);
   E.sap = has('sap') ? G.sugar.add(1).pow(0.1) : ONE;
   E.dense = N.of(2).pow(G.dense);
-  E.global = E.sap.mul(E.dense).mul(litter).mul(E.stone).mul(E.phos).mul(E.germ).mul(E.fusion).mul(E.ach).mul(E.lin);
+  E.global = E.growth.mul(E.seasonMult).mul(E.sap).mul(E.dense).mul(litter).mul(E.stone).mul(E.phos).mul(E.germ).mul(E.fusion).mul(E.ach).mul(E.lin);
   let g = raw.mul(E.global);
   if (has('ring')) g = g.pow(1.05);
   if (has('mat')) g = g.pow(1.05);
   if (G.lineage >= 8) g = g.pow(1.05);
+  if (hasR('ancient')) g = g.pow(1.05);
   E.nutGain = g;
 
-  E.sugarGain = sugar.mul((has('myco') ? 3 : 1) * (G.lineage >= 4 ? 100 : 1));
+  E.sugarGain = sugar.mul((has('myco') ? 3 : 1) * (G.lineage >= 4 ? 100 : 1) * (G.biome === 'desert' ? 0.01 : 1)
+    * (done('desert') ? 10 : 1) * (sn === 3 ? 10 : 1));
   E.truffle = truffle;
-  E.sporeMult = N.of(2 * (has('glow') ? 3 : 1) * (G.lineage >= 1 ? 2 : 1) * truffle).mul(N.of(1.5).pow(G.lineage)).mul(G.lineage >= 7 ? 3 : 1);
+  E.sporeMult = N.of(2 * (has('glow') ? 3 : 1) * (G.lineage >= 1 ? 2 : 1) * truffle).mul(N.of(1.5).pow(G.lineage)).mul(G.lineage >= 7 ? 3 : 1).mul((hasR('cache') ? 100 : 1) * (sn === 2 ? 3 : 1)).mul(E.bark);
   E.sporeGain = G.runEarned.l >= 4 ? G.runEarned.div(1e4).pow(SPORE_EXP).mul(E.sporeMult).floor() : ZERO;
+  E.ringGain = ringGainFor(G.lineage);
 }
 
 // ===== Main tick =====
@@ -447,9 +544,16 @@ function tick(dt) {
   if (G.auto.feed && has('autof')) feedAll(400);
   if (G.auto.trade && G.lineage >= 4) buyAllTrades();
   if (G.auto.spor && has('autosp') && G.stats.runTime > 5) { calc(); if (E.sporeGain.gte(G.spores.max(1))) sporulate(); }
+  if (G.auto.mig && hasR('automig') && migTarget() > G.lineage) migrate();
+  const events = [];
+  if (G.biome && G.lineage >= BIOMES[G.biome].goal) {
+    events.push({ name: BIOMES[G.biome].name + ' complete! ' + BIOMES[G.biome].reward, biome: true });
+    G.biomes[G.biome] = true; G.biome = null;
+  }
+  G.seasonT += dt;
   G.stats.time += dt; G.stats.runTime += dt;
   G.stats.best = G.stats.best.max(G.nut);
-  return checkAchs();
+  return events.concat(checkAchs());
 }
 
 // ===== Save / load =====
@@ -459,11 +563,12 @@ function deserialize(str) {
   const d = JSON.parse(decodeURIComponent(escape(atob(str.trim()))));
   if (!Array.isArray(d.grid) || !d.grid.length) throw new Error('No forest in this save');
   const g = newGame();
-  for (const k of ['nut', 'sugar', 'spores', 'runEarned']) g[k] = N.load(d[k]);
-  for (const k of ['size', 'seed', 'phos', 'carbon', 'dense', 'reach', 'lineage', 'last']) if (typeof d[k] === 'number') g[k] = d[k];
+  for (const k of ['nut', 'sugar', 'spores', 'runEarned', 'rings', 'ringsTotal']) g[k] = N.load(d[k]);
+  for (const k of ['size', 'seed', 'phos', 'carbon', 'dense', 'reach', 'lineage', 'growth', 'seasonT', 'last']) if (typeof d[k] === 'number') g[k] = d[k];
+  g.biome = BIOMES[d.biome] ? d.biome : null;
   g.grid = d.grid.map(t => ({ t: TILES[t.t] ? t.t : 'loam', c: t.c ? 1 : 0, l: +t.l || 0 }));
   if (g.grid.length !== g.size * g.size) throw new Error('This save is damaged');
-  for (const k of ['traits', 'ach', 'auto']) Object.assign(g[k], d[k] || {});
+  for (const k of ['traits', 'ach', 'auto', 'ru', 'biomes']) Object.assign(g[k], d[k] || {});
   Object.assign(g.stats, d.stats || {});
   g.stats.best = N.load(d.stats && d.stats.best);
   g.stats.totalSpores = N.load(d.stats && d.stats.totalSpores);
@@ -473,5 +578,6 @@ function deserialize(str) {
 G = newGame();
 if (typeof module !== 'undefined') {
   module.exports = { N, fmt, newGame, calc, tick, E, get G() { return G; }, set G(v) { G = v; },
-    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, buyAllGenome, buyAllTrades, migTarget, sporulate, migrate, migReq, TRAITS, colonized };
+    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, buyAllGenome, buyAllTrades, migTarget, sporulate, migrate, migReq, TRAITS, colonized,
+    winter, buyOldGrowth, buyGrowth, growthCost, OLD_GROWTH, enterBiome, leaveBiome, BIOMES, allBiomes };
 }
