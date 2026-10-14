@@ -216,7 +216,7 @@ textarea { width: 100%; min-height: 70px; background: var(--bg); color: var(--fg
 'use strict';
 const $ = id => document.getElementById(id);
 let sel = -1, tab = 'trades', builtFor = '', tabSig = '';
-const TRAIT_SWITCH = { autof: 'feed', autoc: 'col' }; // traits with an on/off switch in the Genome tab
+const TRAIT_SWITCH = { autof: 'feed', autoc: 'col', autosp: 'spor' }; // traits with an on/off switch in the Genome tab
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ok = c => c <= G.nut.l + 1e-9;
 
@@ -396,7 +396,7 @@ function renderTile() {
     tileSig = sig;
     if (!t) {
       c.innerHTML = `<h2>Your forest floor</h2><p>Click a tile to inspect it. Your mycelium spreads to tiles touching a colonized one. Glowing outlines mark tiles you can afford right now.</p>
-        <p>Loam makes nutrients. Put loam next to <b>deadwood</b> and <b>water seeps</b> to multiply it, and reach a <b>tree root</b> to start trading for sugar.</p>`;
+        <p>Loam makes nutrients. Look for loam with <b>deadwood</b> or <b>water seeps</b> around it, and colonize those too: their boosts only work once they're colonized. Reach a <b>tree root</b> to start trading for sugar.</p>`;
       return;
     }
     let html = `<div class="tilehead"><div class="swatch t-${t.t}"></div><h2>${TILES[t.t].name} <span class="tag" id="tlv"></span></h2></div><p>${TILES[t.t].info}</p>`;
@@ -432,7 +432,8 @@ function item(name, desc, eff, btn, cls = '') {
 function renderTab() {
   let h = '';
   if (tab === 'trades') {
-    h += '<p>Tree roots pay sugar for the nutrients you send them. Spend it here.</p><div class="list">';
+    h += `<p>Tree roots pay sugar for the nutrients you send them. Spend it here.${G.lineage >= 1 ? ' Your trades are kept when you Sporulate.' : ''}</p>
+      <div class="row" style="margin-bottom:10px"><button class="act go" id="buyalltrades">Buy all affordable</button></div><div class="list">`;
     for (const [id, t] of Object.entries(TRADES)) {
       const c = tradeCost(id);
       h += item(`${t.name} <span class="cost">×${G[id]}</span>`, t.desc(), t.eff(),
@@ -440,13 +441,19 @@ function renderTab() {
     }
     h += '</div>';
   } else if (tab === 'genome') {
-    h += '<p>Spend spores on your genome. Everything here lasts until you Migrate.</p><div class="list">';
+    h += `<p>Spend spores on your genome. Your genome is permanent: Migrating keeps it, and each new lineage unlocks more traits.</p>
+      <div class="row" style="margin-bottom:10px"><button class="act go" id="buyallgenome">Buy all affordable</button><span class="cost">Traits first, cheapest first, then upgrades</span></div><div class="list">`;
     for (const [id, g] of Object.entries(GENES)) {
       const c = geneCost(id);
       h += item(`${g.name} <span class="cost">×${G[id]}</span>`, g.desc(), g.eff(),
         `<button class="act" data-gene="${id}" ${c > G.spores.l + 1e-9 ? 'disabled' : ''}>${fmt(N.lg(c))} spores</button>`);
     }
+    const nextLin = Math.min(...TRAITS.filter(t => t.lin > G.lineage).map(t => t.lin));
     for (const t of TRAITS) {
+      if (t.lin > G.lineage) {
+        if (t.lin === nextLin) h += item(t.name, t.desc, '', `<span class="cost">Lineage ${t.lin}</span>`);
+        continue;
+      }
       const own = has(t.id), sw = TRAIT_SWITCH[t.id];
       const btn = !own ? `<button class="act" data-trait="${t.id}" ${G.spores.lt(t.cost) ? 'disabled' : ''}>${fmt(t.cost)} spores</button>`
         : sw ? `<button class="act" data-switch="${sw}" aria-pressed="${G.auto[sw]}">${G.auto[sw] ? 'On' : 'Off'}</button>` : null;
@@ -454,9 +461,9 @@ function renderTab() {
     }
     h += '</div>';
   } else if (tab === 'lineage') {
-    const can = G.spores.l >= migReq() - 1e-9;
-    h += `<p>Migrate on the wind to a larger forest. You lose spores, traits and genome upgrades, and gain a lineage level: nutrients ×100 and spores ×1.5 per level, plus the perks below.</p>
-      <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${G.lineage + 1}</button><span class="cost">needs ${fmt(N.lg(migReq()))} spores</span></div><div class="list">`;
+    const to = migTarget(), can = to > G.lineage;
+    h += `<p>Migrate on the wind to a larger forest. You spend all your spores and lose your forest, sugar and trades. <b>Your genome is kept.</b> Each lineage gives nutrients ×10, spores ×1.5, new genome traits and the perks below. With enough spores you can jump several lineages at once.</p>
+      <div class="row" style="margin-bottom:12px"><button class="act big ${can ? 'ready' : ''}" id="migrate" ${can ? '' : 'disabled'}>Migrate to lineage ${can ? to : G.lineage + 1}</button><span class="cost">${can ? (to - G.lineage > 1 ? 'jumps ' + (to - G.lineage) + ' lineages' : 'ready') : 'needs ' + fmt(N.lg(migReq())) + ' spores'}</span></div><div class="list">`;
     for (const [l, d] of LINEAGE) h += item('Lineage ' + l, d, '', G.lineage >= l ? '✓' : '', G.lineage >= l ? 'got' : '');
     h += '</div>';
   } else if (tab === 'ach') {
@@ -468,7 +475,8 @@ function renderTab() {
     h += `<div class="toggles" style="margin-bottom:12px">
       <label><input type="checkbox" id="af" ${G.auto.feed ? 'checked' : ''}> Auto-feed</label>
       <label><input type="checkbox" id="ac" ${G.auto.col ? 'checked' : ''}> Auto-colonize</label>
-      <label><input type="checkbox" id="at" ${G.auto.trade ? 'checked' : ''}> Auto-trade</label></div>
+      <label><input type="checkbox" id="at" ${G.auto.trade ? 'checked' : ''}> Auto-trade</label>
+      <label><input type="checkbox" id="as" ${G.auto.spor ? 'checked' : ''}> Auto-sporulate</label></div>
       <dl class="kv"><dt>Time played</dt><dd>${fmtTime(G.stats.time)}</dd><dt>This forest</dt><dd>${fmtTime(G.stats.runTime)}</dd>
       <dt>Sporulations</dt><dd>${G.stats.sporulations}</dd><dt>Most nutrients</dt><dd>${fmt(G.stats.best)}</dd></dl>
       <div class="row" style="margin-top:12px"><button class="act" id="exp">Export save</button><button class="act" id="imp">Import save</button><button class="act" id="wipe">Wipe save</button></div>
@@ -483,8 +491,11 @@ function bindTab() {
   body.querySelectorAll('[data-gene]').forEach(b => b.onclick = () => { if (buyGene(b.dataset.gene, false)) floatAt(b, '+1', 'spo'); refresh(); });
   body.querySelectorAll('[data-trait]').forEach(b => b.onclick = () => { if (buyTrait(b.dataset.trait)) { floatAt(b, 'Evolved!', 'spo'); burst(b, 50); } refresh(); });
   body.querySelectorAll('[data-switch]').forEach(b => b.onclick = () => { G.auto[b.dataset.switch] = !G.auto[b.dataset.switch]; refresh(); });
-  if ($('migrate')) $('migrate').onclick = e => { const b = e.target; if (migrate()) { burst(b, 300); sel = -1; toast('Your spores settled in a new forest. Lineage ' + G.lineage + '.'); refresh(); } };
+  if ($('migrate')) $('migrate').onclick = e => { const b = e.target, n = migrate(); if (n) { burst(b, 300); sel = -1; toast((n > 1 ? `Jumped ${n} lineages! ` : '') + 'Your spores settled in a new forest. Lineage ' + G.lineage + '.'); refresh(); } };
+  if ($('buyallgenome')) $('buyallgenome').onclick = e => { const n = buyAllGenome(); if (n) { floatAt(e.target, '+' + n + ' bought', 'spo'); burst(e.target, 40); } refresh(); };
+  if ($('buyalltrades')) $('buyalltrades').onclick = e => { const n = buyAllTrades(); if (n) floatAt(e.target, '+' + n + ' trades', 'sug'); refresh(); };
   if ($('af')) {
+    $('as').onchange = e => G.auto.spor = e.target.checked;
     $('af').onchange = e => G.auto.feed = e.target.checked;
     $('ac').onchange = e => G.auto.col = e.target.checked;
     $('at').onchange = e => G.auto.trade = e.target.checked;
@@ -499,15 +510,15 @@ function tabSignature() {
   if (tab === 'opts') return 'opts';
   if (tab === 'trades') return [G.phos, G.carbon, ...Object.keys(TRADES).map(id => tradeCost(id) <= G.sugar.l + 1e-9)].join();
   if (tab === 'genome') return [G.dense, G.reach, Object.keys(G.traits).join(), ...Object.keys(GENES).map(id => geneCost(id) <= G.spores.l + 1e-9),
-    ...TRAITS.map(t => G.spores.gte(t.cost)), G.auto.feed, G.auto.col].join();
-  if (tab === 'lineage') return [G.lineage, G.spores.l >= migReq() - 1e-9].join();
+    ...TRAITS.map(t => G.spores.gte(t.cost)), G.auto.feed, G.auto.col, G.auto.spor, G.lineage].join();
+  if (tab === 'lineage') return [G.lineage, migTarget()].join();
   return Object.keys(G.ach).length + tab;
 }
 // A dot on a tab means something in it is ready
 function tabDots() {
   const dots = {
     trades: Object.keys(TRADES).some(id => tradeCost(id) <= G.sugar.l + 1e-9),
-    genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !has(t.id) && G.spores.gte(t.cost)),
+    genome: Object.keys(GENES).some(id => geneCost(id) <= G.spores.l + 1e-9) || TRAITS.some(t => !has(t.id) && t.lin <= G.lineage && G.spores.gte(t.cost)),
     lineage: G.spores.l >= migReq() - 1e-9,
   };
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('dot', !!dots[b.dataset.tab] && b.dataset.tab !== tab));

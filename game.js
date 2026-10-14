@@ -85,9 +85,9 @@ function rng(seed) {
 const TILES = {
   loam:   { name: 'Loam',        cost: 1,   w: 50, info: 'Produces nutrients. Feeding raises its output.' },
   litter: { name: 'Leaf litter', cost: 1.7, w: 17, info: 'Each level adds +10% to all nutrient production.' },
-  wood:   { name: 'Deadwood',    cost: 1.7, w: 12, info: 'Multiplies the output of loam in the 8 tiles around it.' },
+  wood:   { name: 'Deadwood',    cost: 1.7, w: 12, info: 'Once colonized, boosts the loam in the 8 tiles around it. Feeding it raises the boost.' },
   root:   { name: 'Tree root',   cost: 1.5, w: 8,  info: 'A tree trades sugar for your nutrients. Produces sugar.' },
-  seep:   { name: 'Water seep',  cost: 2,   w: 6,  info: 'Multiplies the output of every tile in the 8 tiles around it.' },
+  seep:   { name: 'Water seep',  cost: 2,   w: 6,  info: 'Once colonized, boosts every loam and root in the 8 tiles around it.' },
   stone:  { name: 'Stone',       cost: 0,   w: 7,  info: 'Needs Acidic Hyphae to colonize. Each colonized stone gives ×1.5 nutrients.' },
   truffle:{ name: 'Truffle',     cost: 3,   w: 0,  info: 'Each level adds +5% to spores from Sporulating.' },
 };
@@ -100,7 +100,7 @@ function newGame() {
     phos: 0, carbon: 0, dense: 0, reach: 0,
     traits: {}, ach: {},
     lineage: 0,
-    auto: { feed: true, col: true, trade: true },
+    auto: { feed: true, col: true, trade: true, spor: false },
     stats: { time: 0, runTime: 0, sporulations: 0, migrations: 0, best: ZERO, totalSpores: ZERO },
     last: Date.now(),
   };
@@ -153,7 +153,7 @@ function neighbors8(i, size) {
 // ===== Costs =====
 function scaled(l, S) { return l < S ? l : l + (l - S) * (l - S) / S; }
 const colonized = () => G.grid.reduce((a, t) => a + t.c, 0);
-function colRatio() { return 3 - (has('rhizo') ? 0.5 : 0) - (G.lineage >= 6 ? 0.25 : 0); }
+function colRatio() { return 2.4 - (has('rhizo') ? 0.4 : 0) - (G.lineage >= 6 ? 0.2 : 0); }
 function colCost(i) { // log10
   const n = colonized();
   return Math.log10(15) + Math.log10(colRatio()) * scaled(n - 1, 40) + (G.grid[i].t === 'stone' ? 2 : 0);
@@ -243,22 +243,28 @@ function buyTrade(id, max) {
 
 // ===== Genome traits (bought with spores) =====
 const TRAITS = [
-  { id: 'germ',   cost: 1,   name: 'Fast germination', desc: 'Unspent spores boost nutrient production', eff: () => '×' + fmt(E.germ) },
-  { id: 'autof',  cost: 3,   name: 'Hungry hyphae',    desc: 'Automatically feed the cheapest tile' },
-  { id: 'acid',   cost: 8,   name: 'Acidic hyphae',    desc: 'Lets you colonize stone' },
-  { id: 'rhizo',  cost: 20,  name: 'Rhizomorphs',      desc: 'Colonizing gets more expensive more slowly (×3 → ×2.5)' },
-  { id: 'myco',   cost: 50,  name: 'Mycorrhiza',       desc: 'Tree roots produce 3× sugar' },
-  { id: 'autoc',  cost: 150, name: 'Exploration',      desc: 'Automatically colonize the cheapest reachable tile' },
-  { id: 'enzyme', cost: 500, name: 'Lignin enzymes',   desc: 'Deadwood bonuses are raised ^1.5' },
-  { id: 'memory', cost: 2e3, name: 'Spore memory',     desc: 'Keep sugar trades when you Sporulate' },
-  { id: 'fusion', cost: 8e3, name: 'Hyphal fusion',    desc: 'Every colonized tile multiplies nutrients by ×1.04', eff: () => '×' + fmt(E.fusion) },
-  { id: 'glow',   cost: 4e4, name: 'Bioluminescence',  desc: 'Spores from Sporulating ×3' },
-  { id: 'drift',  cost: 3e5, name: 'Spore drift',      desc: 'Gain 5% of your pending spores every second' },
-  { id: 'ring',   cost: 3e6, name: 'Fairy ring',       desc: 'Nutrient production ^1.05' },
+  { id: 'germ',   lin: 0, cost: 1,    name: 'Fast germination', desc: 'Unspent spores boost nutrient production', eff: () => '×' + fmt(E.germ) },
+  { id: 'autof',  lin: 0, cost: 5,    name: 'Hungry hyphae',    desc: 'Automatically feed the cheapest tile' },
+  { id: 'acid',   lin: 0, cost: 25,   name: 'Acidic hyphae',    desc: 'Lets you colonize stone' },
+  { id: 'rhizo',  lin: 0, cost: 100,  name: 'Rhizomorphs',      desc: 'Colonizing gets more expensive more slowly (×2.4 → ×2.0)' },
+  { id: 'myco',   lin: 0, cost: 500,  name: 'Mycorrhiza',       desc: 'Tree roots produce 3× sugar' },
+  { id: 'autoc',  lin: 0, cost: 2e3,  name: 'Exploration',      desc: 'Automatically colonize the cheapest reachable tile' },
+  { id: 'enzyme', lin: 0, cost: 1e4,  name: 'Lignin enzymes',   desc: 'Deadwood boosts are doubled' },
+  { id: 'drift',  lin: 1, cost: 1e5,  name: 'Spore drift',      desc: 'Gain 5% of your pending spores every second' },
+  { id: 'fusion', lin: 1, cost: 1e6,  name: 'Hyphal fusion',    desc: 'Every colonized tile multiplies nutrients by ×1.04', eff: () => '×' + fmt(E.fusion) },
+  { id: 'deep',   lin: 2, cost: 1e8,  name: 'Deep roots',       desc: 'Water seep boosts are tripled' },
+  { id: 'glow',   lin: 2, cost: 1e9,  name: 'Bioluminescence',  desc: 'Spores from Sporulating ×3' },
+  { id: 'sniff',  lin: 3, cost: 1e11, name: 'Truffle scent',    desc: 'Truffle bonuses are tripled' },
+  { id: 'sap',    lin: 3, cost: 1e12, name: 'Sap tap',          desc: 'Sugar you hold boosts nutrient production', eff: () => '×' + fmt(E.sap) },
+  { id: 'ring',   lin: 4, cost: 1e14, name: 'Fairy ring',       desc: 'Nutrient production ^1.05' },
+  { id: 'autosp', lin: 5, cost: 1e16, name: 'Spore clock',      desc: 'Automatically Sporulate when it would at least double your spores' },
+  { id: 'canopy', lin: 6, cost: 1e19, name: 'Canopy drop',      desc: 'Leaf litter bonuses are tripled' },
+  { id: 'mat',    lin: 7, cost: 1e22, name: 'Mycelial mat',     desc: 'Nutrient production ^1.05 again' },
+  { id: 'elder',  lin: 8, cost: 1e25, name: 'Elder network',    desc: 'Each lineage multiplies nutrients ×100 instead of ×10' },
 ];
 function buyTrait(id) {
   const t = TRAITS.find(x => x.id === id);
-  if (!t || G.traits[id] || G.spores.lt(t.cost)) return false;
+  if (!t || G.traits[id] || G.lineage < t.lin || G.spores.lt(t.cost)) return false;
   G.spores = G.spores.sub(t.cost); G.traits[id] = true;
   return true;
 }
@@ -271,7 +277,7 @@ const GENES = {
            desc: () => 'Feeding costs start climbing steeply 25 levels later',
            eff: () => 'from level ' + feedScaleStart() },
 };
-const geneCost = (id, l = G[id]) => GENES[id].base + Math.log10(GENES[id].ratio) * (G.lineage >= 9 ? 0.6 : 1) * scaled(l, 30);
+const geneCost = (id, l = G[id]) => GENES[id].base + Math.log10(GENES[id].ratio) * scaled(l, 30);
 function buyGene(id, max) {
   const cur = G[id];
   const L = max ? maxLevel(l => geneCost(id, l), cur, G.spores.l) : (geneCost(id) <= G.spores.l + 1e-9 ? cur + 1 : cur);
@@ -281,17 +287,40 @@ function buyGene(id, max) {
   return true;
 }
 
+// Buy every affordable trait (cheapest first), then pour the rest into the repeatable upgrades
+function buyAllGenome() {
+  let n = 0;
+  for (const t of TRAITS.slice().sort((a, b) => a.cost - b.cost)) if (buyTrait(t.id)) n++;
+  for (let k = 0; k < 200; k++) {
+    const id = geneCost('dense') <= geneCost('reach') ? 'dense' : 'reach';
+    if (!buyGene(id, false)) break;
+    n++;
+  }
+  return n;
+}
+function buyAllTrades() {
+  let n = 0;
+  for (let k = 0; k < 500; k++) {
+    const id = tradeCost('phos') <= tradeCost('carbon') ? 'phos' : 'carbon';
+    if (!buyTrade(id, false)) break;
+    n++;
+  }
+  return n;
+}
+
 // ===== Lineage (second reset) =====
-const migReq = (L = G.lineage) => L === 0 ? 4 : 8.5 + 1.8 * L; // log10 of spores needed
+const MIG = [3, 8, 11.5, 15, 18.5, 22, 24.5, 28.5, 34, 39]; // log10 spores needed to leave each lineage
+const migReq = (L = G.lineage) => MIG[Math.min(L, MIG.length - 1)] + Math.max(0, L - MIG.length + 1) * 4;
+// The lineage your spores could carry you to right now
+function migTarget() { let L = G.lineage; while (G.spores.l >= migReq(L) - 1e-9 && L < G.lineage + 50) L++; return L; }
 const LINEAGE = [
-  [1, 'Hungry hyphae and Exploration are kept when you migrate. Spores ×2'],
-  [2, 'Forests grow to 8 × 8, and one size larger every 2 lineages up to 11 × 11'],
+  [1, 'Sugar trades are kept when you Sporulate'],
+  [2, 'Forests grow to 8 × 8, then one size larger every 2 lineages up to 11 × 11'],
   [3, 'Truffles appear in new forests'],
-  [4, 'Sugar ×1,000. Sugar trades are bought automatically'],
-  [6, 'Colonizing gets more expensive more slowly (−0.25)'],
-  [7, 'Spores from Sporulating ×10'],
+  [4, 'Sugar ×100. Sugar trades are bought automatically'],
+  [6, 'Colonizing gets more expensive more slowly (−0.2)'],
+  [7, 'Spores from Sporulating ×3'],
   [8, 'Nutrient production ^1.05'],
-  [9, 'Dense hyphae and Long reach get more expensive more slowly'],
   [10, 'The forest is one network. You finished Wood Wide Web; keep growing if you like'],
 ];
 const forestSize = () => 7 + Math.min(4, Math.floor(G.lineage / 2));
@@ -302,7 +331,7 @@ function newForest() {
   G.size = forestSize();
   G.grid = makeForest(G.seed, G.size, G.lineage);
   G.nut = ZERO; G.runEarned = ZERO; G.stats.runTime = 0;
-  if (!has('memory')) { G.sugar = ZERO; G.phos = 0; G.carbon = 0; }
+  if (G.lineage < 1) { G.sugar = ZERO; G.phos = 0; G.carbon = 0; }
 }
 function sporulate() {
   calc();
@@ -314,16 +343,15 @@ function sporulate() {
   return true;
 }
 function migrate() {
-  if (G.spores.l < migReq() - 1e-9) return false;
-  G.lineage++;
+  const to = migTarget();
+  if (to <= G.lineage) return 0;
+  const jumped = to - G.lineage;
+  G.lineage = to;
   G.stats.migrations++;
-  const keep = {};
-  if (G.lineage >= 1) for (const id of ['autof', 'autoc']) if (G.traits[id]) keep[id] = true;
-  G.traits = keep;
-  G.spores = ZERO; G.dense = 0; G.reach = 0;
-  newForest();
+  G.spores = ZERO; // your genome (traits and upgrades) is kept
   G.sugar = ZERO; G.phos = 0; G.carbon = 0;
-  return true;
+  newForest();
+  return jumped;
 }
 
 // ===== Achievements =====
@@ -355,17 +383,18 @@ function checkAchs() {
 
 // ===== Derived values =====
 function tileMults(i) {
+  // Bonuses from several neighbours add up rather than multiply, so no single lucky tile runs the game
   let wood = 1, seep = 1;
   for (const j of neighbors8(i, G.size)) {
     const n = G.grid[j];
     if (!n.c) continue;
-    if (n.t === 'wood') wood *= Math.pow(1.5 + 0.25 * n.l, has('enzyme') ? 1.5 : 1);
-    else if (n.t === 'seep') seep *= 1.25 + 0.1 * n.l;
+    if (n.t === 'wood') wood += (0.5 + 0.15 * n.l) * (has('enzyme') ? 2 : 1);
+    else if (n.t === 'seep') seep += (0.25 + 0.08 * n.l) * (has('deep') ? 3 : 1);
   }
   return { wood, seep };
 }
-const SPORE_EXP = 0.25, LIN_MULT = 100;
-const loamYield = l => N.of(l).mul(N.of(1.12).pow(l - 1));
+const SPORE_EXP = 0.3, LIN_MULT = 10;
+const loamYield = l => N.of(l).mul(N.of(1.15).pow(l - 1));
 const rootYield = l => N.of(0.1 * l).mul(N.of(1.15).pow(l - 1));
 function calc() {
   const tiles = E.tiles = [];
@@ -378,30 +407,32 @@ function calc() {
       else if (t.t === 'root') { out = rootYield(t.l).mul(m.seep); sugar = sugar.add(out); }
       else if (t.t === 'litter') litterLv += t.l;
       else if (t.t === 'stone') stones++;
-      else if (t.t === 'truffle') truffle += 0.05 * t.l;
+      else if (t.t === 'truffle') truffle += 0.05 * t.l * (has('sniff') ? 3 : 1);
     }
     tiles.push({ out, wood: m.wood, seep: m.seep });
   }
   const n = colonized();
   E.colonized = n;
-  const litter = E.litter = N.of(1 + 0.1 * litterLv);
+  const litter = E.litter = N.of(1 + 0.1 * litterLv * (has('canopy') ? 3 : 1));
   E.stone = N.of(1.5).pow(stones);
   E.phos = N.of(2).pow(G.phos);
   E.germ = has('germ') ? G.spores.add(1).pow(0.15) : ONE;
   E.fusion = has('fusion') ? N.of(1.04).pow(n) : ONE;
   E.ach = N.of(1.05).pow(Object.keys(G.ach).length);
-  E.lin = N.of(LIN_MULT).pow(G.lineage);
+  E.lin = N.of(has('elder') ? 100 : LIN_MULT).pow(G.lineage);
+  E.sap = has('sap') ? G.sugar.add(1).pow(0.1) : ONE;
   E.dense = N.of(2).pow(G.dense);
-  E.global = E.dense.mul(litter).mul(E.stone).mul(E.phos).mul(E.germ).mul(E.fusion).mul(E.ach).mul(E.lin);
+  E.global = E.sap.mul(E.dense).mul(litter).mul(E.stone).mul(E.phos).mul(E.germ).mul(E.fusion).mul(E.ach).mul(E.lin);
   let g = raw.mul(E.global);
   if (has('ring')) g = g.pow(1.05);
+  if (has('mat')) g = g.pow(1.05);
   if (G.lineage >= 8) g = g.pow(1.05);
   E.nutGain = g;
 
-  E.sugarGain = sugar.mul((has('myco') ? 3 : 1) * (G.lineage >= 4 ? 1e3 : 1));
+  E.sugarGain = sugar.mul((has('myco') ? 3 : 1) * (G.lineage >= 4 ? 100 : 1));
   E.truffle = truffle;
-  E.sporeMult = N.of((has('glow') ? 3 : 1) * (G.lineage >= 1 ? 2 : 1) * truffle).mul(N.of(1.5).pow(G.lineage)).mul(G.lineage >= 7 ? 10 : 1);
-  E.sporeGain = G.runEarned.l >= 5 ? G.runEarned.div(1e5).pow(SPORE_EXP).mul(E.sporeMult).floor() : ZERO;
+  E.sporeMult = N.of(2 * (has('glow') ? 3 : 1) * (G.lineage >= 1 ? 2 : 1) * truffle).mul(N.of(1.5).pow(G.lineage)).mul(G.lineage >= 7 ? 3 : 1);
+  E.sporeGain = G.runEarned.l >= 4 ? G.runEarned.div(1e4).pow(SPORE_EXP).mul(E.sporeMult).floor() : ZERO;
 }
 
 // ===== Main tick =====
@@ -414,7 +445,8 @@ function tick(dt) {
   if (has('drift')) G.spores = G.spores.add(E.sporeGain.mul(0.05 * dt));
   if (G.auto.col && has('autoc')) colonizeCheapest();
   if (G.auto.feed && has('autof')) feedAll(400);
-  if (G.auto.trade && G.lineage >= 4) { buyTrade('phos', true); buyTrade('carbon', true); }
+  if (G.auto.trade && G.lineage >= 4) buyAllTrades();
+  if (G.auto.spor && has('autosp') && G.stats.runTime > 5) { calc(); if (E.sporeGain.gte(G.spores.max(1))) sporulate(); }
   G.stats.time += dt; G.stats.runTime += dt;
   G.stats.best = G.stats.best.max(G.nut);
   return checkAchs();
@@ -441,5 +473,5 @@ function deserialize(str) {
 G = newGame();
 if (typeof module !== 'undefined') {
   module.exports = { N, fmt, newGame, calc, tick, E, get G() { return G; }, set G(v) { G = v; },
-    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, sporulate, migrate, migReq, TRAITS, colonized };
+    feedAll, colonizeCheapest, buyTrade, buyTrait, buyGene, buyAllGenome, buyAllTrades, migTarget, sporulate, migrate, migReq, TRAITS, colonized };
 }
